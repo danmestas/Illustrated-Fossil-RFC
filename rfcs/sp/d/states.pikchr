@@ -1,0 +1,26 @@
+margin = 0.15in
+boxht = 0.5
+boxwid = 1.6
+$col = 2.1
+$row = 1.05
+
+# States on a three-column grid, centred on EXCHANGE.
+INIT: box "INIT" bold "no round sent" small
+CLONE_ROUND0: box "CLONE_ROUND0" bold "first clone round" small at INIT + (-$col, -$row)
+EXCHANGE: box "EXCHANGE" bold "repeats while §3.7 holds" small at INIT + (0, -$row)
+TERMINATED: box "TERMINATED" bold "no condition holds" small at EXCHANGE + ($col, 0)
+ABORTED: box "ABORTED" bold "fatal failure" small at EXCHANGE + (0, -$row)
+
+# Connectors last.
+arrow from INIT.w left until even with CLONE_ROUND0 then to CLONE_ROUND0.n
+text "clone 3 1" small at ((INIT.w.x + CLONE_ROUND0.x) / 2, INIT.y + 0.15)
+arrow from INIT.s to EXCHANGE.n
+text "push · pull · sync" small ljust at (INIT.x + 0.12, (INIT.s.y + EXCHANGE.n.y) / 2)
+arrow from CLONE_ROUND0.e to EXCHANGE.w
+text "reply" small at ((CLONE_ROUND0.e.x + EXCHANGE.w.x) / 2, EXCHANGE.y + 0.15)
+arrow from EXCHANGE.e to TERMINATED.w
+text "none" small at ((EXCHANGE.e.x + TERMINATED.w.x) / 2, EXCHANGE.y + 0.15)
+arrow from EXCHANGE.s to ABORTED.n
+text "fatal" small ljust at (EXCHANGE.x + 0.12, (EXCHANGE.s.y + ABORTED.n.y) / 2)
+arrow from CLONE_ROUND0.s down until even with ABORTED then to ABORTED.w
+text "transport failure" small at ((ABORTED.w.x + CLONE_ROUND0.x) / 2, ABORTED.y - 0.15)

@@ -1,0 +1,347 @@
+<header class="hero">
+  <div class="eyebrow">draft-fossil-repo-state-00 · an illustrated reading</div>
+  <h1>Fossil Repository State</h1>
+  <p class="lede">A Fossil repository stores only immutable artifacts. Branches, tags, leaves, closed markers and the current trunk are not written down anywhere: every repository computes them from the artifacts it holds. This reading walks through those rules and shows each derived table beside the section that defines it, read from this draft's own repository.</p>
+</header>
+
+<section class="prose" id="rs-intro">
+  <h2 data-draft="s1"><span class="sec">§1</span>Facts no artifact records</h2>
+  <p>Every check-in, tag and edit is an artifact: a run of bytes named by its own hash, never changed once written. History is the append-only set of those artifacts. That gives strong integrity, but some everyday questions have no artifact that answers them. Which check-in is the latest on trunk? Which branch does a check-in belong to? Which leaves are still open? What does a tag point to now? (§1)</p>
+  <p>Each answer is implied by the whole set. A repository works it out by reading the parent links and tag records spread across the artifacts. The draft calls the result the repository's <b>state</b>: the check-in ancestry graph, branch and tag membership, open leaves, closed markers, and the check-in a symbolic name selects. The rules are fixed so that two independent implementations reading the same artifacts reach the same answers (§1).</p>
+  <p>One answer has a local input. The current trunk also depends on the repository's <code>main-branch</code> setting, so two repositories with the same artifacts can name different current-trunk check-ins when that setting differs (§1, §9).</p>
+
+  <h3 data-draft="s1-1"><span class="sec">§1.1</span>What this draft covers, and what it borrows</h3>
+  <p>The scope is the meaning computed from parent and tag cards (P and T cards): ancestry, branch membership, named and symbolic references, leaves, closed markers and current-trunk resolution. The companion drafts supply the rest (§1.1):</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Draft</th><th>Supplies</th></tr></thead>
+    <tbody>
+      <tr><td>Artifact Format</td><td>The byte grammar of P and T cards, hash formats and lengths, content-type rules, hash-to-check-in resolution, delta-manifest reconstruction.</td></tr>
+      <tr><td>Delta Format</td><td>Only the content-delta encoding underneath.</td></tr>
+      <tr><td>Sync Protocol</td><td>How artifacts move between peers. The state rules hold however the artifacts arrived.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Ordering uses the numeric <code>event.mtime</code> and <code>tagxref.mtime</code> values derived from artifact timestamps. Results are reproducible only when the stored D-card timestamp names a fixed instant. The compatibility literals <code>now</code>, <code>subsec</code> and <code>subsecond</code> fall outside the reproducible rules (§1.1).</p>
+</section>
+
+<section class="prose" id="rs-terms">
+  <h2 data-draft="s2"><span class="sec">§2</span>Terminology</h2>
+  <p>The draft uses <span class="req">MUST</span>, <span class="req">SHOULD</span> and <span class="req">MAY</span> in the BCP 14 sense, and only when capitalised. Card, manifest and the card letters come from the Artifact Format unchanged (§2).</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td>rid</td><td>The local integer id of a stored artifact. A hash names an artifact everywhere; its rid names it in one repository only and is never synchronised. The derived views are computed over rids.</td></tr>
+      <tr><td>Check-in DAG</td><td>Check-ins joined by parent links. Every check-in but an initial one names one or more parents.</td></tr>
+      <tr><td>Primary parent</td><td>The first parent listed. It fixes the check-in's place for branch inheritance and ancestry walks.</td></tr>
+      <tr><td>Merge parent</td><td>Any parent after the first. It records lines of development joining.</td></tr>
+      <tr><td>Tag</td><td>A named annotation on a check-in that asserts a property of it and its descendants, or revokes one.</td></tr>
+      <tr><td>Tag type</td><td>Cancel (<code>-</code>), singleton (<code>+</code>) or propagating (<code>*</code>), stored as 0, 1 and 2. A type above zero means the tag is active on that check-in.</td></tr>
+      <tr><td>Branch</td><td>The propagating tag 8 and the check-ins it is in effect on. A check-in's branch is the innermost active branch tag reaching it along primary links, never across merge edges.</td></tr>
+      <tr><td>Leaf</td><td>A check-in with no child on the same branch. It <span class="req">MAY</span> have children on other branches and still be a leaf.</td></tr>
+      <tr><td>Open leaf</td><td>A leaf without an active closed marker.</td></tr>
+      <tr><td>Symbolic name</td><td>A user-facing name, stored with a <code>sym-</code> prefix. Commands <span class="req">MUST</span> prepend <code>sym-</code> unless a raw-name option is given.</td></tr>
+      <tr><td>Current-trunk</td><td>The check-in the <code>main-branch</code> name (default <code>trunk</code>) resolves to. It need not be an open leaf.</td></tr>
+    </tbody>
+  </table></div>
+  <p>The prefixes <code>sym-</code>, <code>wiki-</code>, <code>tkt-</code> and <code>event-</code> are reserved. Only <code>sym-</code> tags <span class="req">MAY</span> come from ordinary user tagging; the other three <span class="req">MUST NOT</span> be created directly by users (§2).</p>
+  <p>The tag names live in a <code>tag</code> table indexed by tagid (§2). Here it is for this repository. The draft fixes two ids: tagid 8 is <code>branch</code> and tagid 9 is <code>closed</code>. <code>sym-trunk</code> comes from the initial check-in, which starts the default branch (§6.1).</p>
+  <div class="tool wide" data-nosearch data-rs-table="tag" data-title="The tag table" id="rs-t-tag"></div>
+</section>
+
+<section class="prose" id="rs-dag">
+  <h2 data-draft="s3"><span class="sec">§3</span>Building the check-in DAG</h2>
+  <p>Each check-in manifest names its parents in its P card. An initial check-in has an empty P card; a merge names several. A reader turns every parent reference into a parent/child linkage record once and walks those records afterwards, instead of re-parsing manifests on every query (§3).</p>
+
+  <h3 data-draft="s3-1"><span class="sec">§3.1</span>One row per parent and child</h3>
+  <p>Each linkage row is keyed on the pair (parent-id, child-id) and carries a flag saying whether the parent is primary, the check-in's modification time, and a baseline id used for delta-manifest reconstruction (§3.1). The pair is unique. A manifest <span class="req">MAY</span> name the same parent twice, since the Artifact Format does not require P-card references to be sorted or deduplicated, and the table keeps a single row for the pair (§3.1).</p>
+  <p>Section 7.1 names this table <code>plink</code>. Its columns map directly: <code>pid</code> and <code>cid</code> are the pair, <code>isprim</code> is the flag, <code>mtime</code> the time, <code>baseid</code> the baseline.</p>
+  <div class="tool wide" data-nosearch data-rs-table="plink" data-title="plink: the linkage records" id="rs-t-plink"></div>
+
+  <h3 data-draft="s3-2"><span class="sec">§3.2</span>Primary parent and merge parents</h3>
+  <p>Exactly one linkage row per child has the primary flag set: the row for the first hash on the P card. Every other parent gets a row with the flag unset, marking a merge parent. A sole parent is primary. When a P card repeats a hash, the row keeps the flag chosen by that hash's first appearance (§3.2).</p>
+  <p>A reader <span class="req">MUST</span> treat the primary row as the mainline ancestor for linear-history operations such as first-parent traversal and the timeline's mainline. Merge rows <span class="req">MUST</span> be included when full ancestry is needed, for a merge base or an ancestor test, and <span class="req">MUST NOT</span> be treated as the mainline predecessor (§3.2).</p>
+
+  <h3 data-draft="s3-3"><span class="sec">§3.3</span>Walking both ways</h3>
+  <p>Edges run from parent to child. Manifests name their parents by hash and never change, so an edge's direction is fixed when it is written (§3.3). The same rows serve both walks: toward the origin through an index on (child-id, parent-id), and toward descendants through the (parent-id, child-id) key. There is no separate ancestor or descendant store (§3.3).</p>
+</section>
+
+<section class="prose" id="rs-crosslink">
+  <h2 data-draft="s4"><span class="sec">§4</span>Crosslinking</h2>
+  <p>Crosslinking is the step that reads a stored artifact's cards and turns them into repository state. T cards are validated first, then routed into tag and branch state (§4).</p>
+
+  <h3 data-draft="s4-1"><span class="sec">§4.1</span>Checking T cards</h3>
+  <p>A T card holds a tag name, an artifact hash or the self-tag marker <code>*</code>, and an optional value. Before any effect is applied (§4.1):</p>
+  <ul class="plain">
+    <li>The name <span class="req">MUST</span> start with <code>-</code>, <code>+</code> or <code>*</code>: cancel, singleton or propagating.</li>
+    <li>Without that prefix, the name <span class="req">MUST NOT</span> be all hexadecimal digits, at any length, so it cannot be mistaken for a hash.</li>
+    <li>T cards in one manifest <span class="req">MUST</span> be strictly ascending by name, then by hash.</li>
+    <li>A hash field of <code>*</code> makes a self-tag, which applies to the manifest being parsed.</li>
+  </ul>
+  <pre class="code wide">T *branch * feature          propagating, self-tag, value "feature"
+T *sym-feature *             propagating symbolic name, self-tag
+T -sym-trunk *               cancel the inherited sym-trunk</pre>
+  <p>These three cards are in ascending order whether or not the prefix character counts toward the name. A manifest that fails any check <span class="req">MUST</span> be rejected whole: no partial tag state comes from an invalid card set (§4.1).</p>
+
+  <h3 data-draft="s4-2"><span class="sec">§4.2</span>The crosslink procedure</h3>
+  <p>Once its T cards are valid, the crosslink step applies the manifest (§4.2):</p>
+  <ol class="plain">
+    <li><b>Target.</b> A self-tag targets the artifact being crosslinked. Otherwise the hash is resolved to an rid. A hash not yet stored resolves to a <i>phantom</i>, an rid with no content. The effect is recorded against it and shows once the artifact arrives. A missing parent in the DAG is handled the same way, not as a fatal error.</li>
+    <li><b>Applicability.</b> The loop that applies tags, one tag write per card, runs only for control, manifest and event artifacts.</li>
+    <li><b>Clusters.</b> A cluster gets an implicit singleton cluster tag outside that loop, whatever T cards it carries.</li>
+    <li><b>Propagation.</b> If the check-in has a resolved primary parent, the parent's tags <span class="req">MUST</span> be propagated again from the parent (§5.4). Every tag applied to a resolved target also <span class="req">MUST</span> start a propagation walk from that target, with singletons first turned into cancels (§5.3).</li>
+    <li><b>Idempotency.</b> Crosslinking again <span class="req">MUST NOT</span> add another linkage or event record. Fossil checks whether it has already recorded the manifest's file changes, and skips it if so. A manifest with no parent and no files has nothing to record, so the check cannot see it, but running again still leaves a single timeline row. Other markers are allowed if the stored result is the same. Steps 1 to 4 still run.</li>
+    <li><b>Batching.</b> Crosslinks <span class="req">MAY</span> run as one batch in a single transaction. At the end, singleton reparent operations recorded during the batch are applied again, so a parent changed mid-batch ends up in the final state.</li>
+  </ol>
+
+  <h3 data-draft="s4-3"><span class="sec">§4.3</span>Rejection</h3>
+  <p>The three syntax checks of §4.1 are the rejection list: no prefix, an all-hex name, or cards out of order. A manifest that fails one gets no tag writes, no propagation and no linkage at all (§4.3).</p>
+
+  <h3 data-draft="s4-4"><span class="sec">§4.4</span>Artifacts a parser cannot classify</h3>
+  <p>A conforming repository can hold artifacts a conforming parser declines to classify. The Artifact Format's required-card rule is one cause, and the reference repository has instances of it (§4.4). The draft separates two failures:</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>The artifact</th><th>Repository state</th></tr></thead>
+    <tbody>
+      <tr><td>Hashes to its name, but cannot be classified</td><td>Stored correctly. Assembly <span class="req">MUST NOT</span> fail. The artifact is opaque: no linkage, no tags, no branch membership, as if it were a non-participating type.</td></tr>
+      <tr><td>Does not hash to its name</td><td>An integrity failure. An implementation <span class="req">MUST</span> reject it.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Diagnostics <span class="req">SHOULD</span> tell the two apart. Calling a classification failure damage sends the operator after a defect the verified hash has already ruled out (§4.4).</p>
+
+  <h3 data-draft="s4-5"><span class="sec">§4.5</span>How crosslinks read in comments</h3>
+  <p>Generated comments fold some card combinations into one edit. A <code>*branch</code> card reads as “Move to branch”, and its paired <code>-sym-</code> and <code>*sym-</code> cards are folded silently into it. On their own, those two read as “Cancel tag” and “Add propagating tag”. This is presentation only; tag state is unchanged (§4.5).</p>
+
+  <h3 data-draft="s4-6"><span class="sec">§4.6</span>Writing a tag</h3>
+  <p>A tag or antitag starts as a control artifact with exactly one T card, <code>T &lt;c&gt;&lt;prefix&gt;&lt;name&gt; &lt;uuid&gt; [value]</code>, where the leading character follows the tag type. The artifact is stored and then crosslinked like any other, and its card is checked by the same rules (§4.6).</p>
+</section>
+
+<section class="prose" id="rs-tags">
+  <h2 data-draft="s5"><span class="sec">§5</span>Tag types and propagation</h2>
+
+  <h3 data-draft="s5-1"><span class="sec">§5.1</span>Three types</h3>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Prefix</th><th>Type</th><th>Value</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td class="num">-</td><td>cancel</td><td class="num">0</td><td>Removes or blocks a tag's effect.</td></tr>
+      <tr><td class="num">+</td><td>singleton</td><td class="num">1</td><td>Applies to the target only.</td></tr>
+      <tr><td class="num">*</td><td>propagating</td><td class="num">2</td><td>Applies to the target and carries forward along its primary children.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Any other leading character <span class="req">MUST</span> be a fatal crosslink error (§5.1).</p>
+
+  <h3 data-draft="s5-2"><span class="sec">§5.2</span>Where tag state lives</h3>
+  <p>Tag state is the <code>tagxref</code> table, unique per (artifact, tag). Each row holds the tag type; <code>srcid</code>, the artifact whose T card applied the tag, or zero when the value was propagated in from an ancestor; <code>origid</code>, the artifact that originally holds a propagating tag; the value; an <code>mtime</code>; and <code>rid</code>, the artifact the row describes. Because (rid, tag) is unique, an artifact has at most one live entry per tag, and later writes replace earlier ones (§5.2).</p>
+  <div class="tool wide" data-nosearch data-rs-table="tagxref" data-title="tagxref: tag state per check-in" id="rs-t-tagxref"></div>
+  <p>When history is a single line on trunk, only the first check-in has direct rows, because it carries the branch and <code>sym-trunk</code> cards (§6.1). Every later row has <code>srcid</code> 0, <code>origid</code> pointing at the first check-in, and the first check-in's <code>mtime</code>, not its own (§5.4 step 4).</p>
+
+  <h3 data-draft="s5-3"><span class="sec">§5.3</span>Applying a tag directly</h3>
+  <ol class="plain">
+    <li>If the (tag, artifact) row already has an <code>mtime</code> at or after the incoming one, the write <span class="req">MUST</span> be skipped. A strictly later time wins. With exactly equal times, the winner depends on write order and is implementation-defined.</li>
+    <li>Otherwise the row is replaced: the raw type from the card, <code>srcid</code> the artifact carrying the card, <code>origid</code> and <code>rid</code> the target.</li>
+    <li>A cancel clears the value to null.</li>
+    <li>Before propagation, a singleton is downgraded to a cancel. It never passes its value on, and it blocks a same-named tag from propagating through it. A propagating tag passes unchanged.</li>
+  </ol>
+
+  <h3 data-draft="s5-4"><span class="sec">§5.4</span>Propagation</h3>
+  <p>Propagation carries a tag from an artifact to its descendants along primary links only. It <span class="req">MUST NOT</span> follow merge links, so a tag reached only through a merge has no effect past the artifact it names (§5.4). The walk accepts only type 2 or type 0 and <span class="req">MUST</span> reject anything else.</p>
+  <!--FIG:rs-propagation-->
+  <p>In the figure, <code>c1</code> and <code>f1</code> carry direct branch tags. Trunk's tag walks c2 to c5 along primary links. It does not enter <code>f1</code>, whose own row is direct. Feature's tag reaches <code>f2</code>, and the dashed merge into <code>c5</code> carries nothing. <code>f2</code> has a child, but on another branch, so it is still a leaf of feature (§2).</p>
+  <ol class="plain">
+    <li>Seed a priority queue, ordered by mtime, with the starting artifact.</li>
+    <li>Take an artifact from the queue and list its primary children.</li>
+    <li>A child qualifies only if its row has <code>srcid</code> 0 and an <code>mtime</code> strictly earlier than the tag's. A nonzero <code>srcid</code> or an equal or later time keeps the existing row. A child with no row qualifies for type 2 but not for a cancel, so a cancel stops where there is nothing to delete.</li>
+    <li>Type 2 replaces the child's row with type 2, <code>srcid</code> 0, the origin's <code>origid</code>, value and <code>mtime</code>. Type 0 deletes the child's row.</li>
+    <li>Each child that changed joins the queue.</li>
+    <li>The walk ends when the queue is empty.</li>
+  </ol>
+  <p>The stepper runs these rules on a five-check-in primary chain. Every check-in starts with the tag <code>milestone</code> = <code>alpha</code>, applied directly at <code>c1</code> at time 10 and propagated to the rest. Pick a target and a prefix, then apply; each apply uses the time shown and moves it on by 10. Set the time to 5 to see §5.3 step 1 skip the write, or put a <code>*</code> on c3 and then a later one on c1 to see c3 block it.</p>
+  <div class="tool wide" data-nosearch id="rs-sim">
+    <div class="tool-h"><b>Apply a tag to a primary chain</b><span>§5.3 to §5.5</span></div>
+    <div class="row">
+      <button class="btn" type="button" id="rs-sim-t-c1">c1</button>
+      <button class="btn" type="button" id="rs-sim-t-c2">c2</button>
+      <button class="btn" type="button" id="rs-sim-t-c3">c3</button>
+      <button class="btn" type="button" id="rs-sim-t-c4">c4</button>
+      <button class="btn" type="button" id="rs-sim-t-c5">c5</button>
+      <span>·</span>
+      <button class="btn" type="button" id="rs-sim-y-2">* propagating</button>
+      <button class="btn" type="button" id="rs-sim-y-1">+ singleton</button>
+      <button class="btn" type="button" id="rs-sim-y-0">- cancel</button>
+    </div>
+    <div class="row">
+      <div class="field"><label for="rs-sim-value">Value</label><input id="rs-sim-value" value="beta" spellcheck="false"></div>
+      <div class="field"><label for="rs-sim-mtime">mtime</label><input id="rs-sim-mtime" inputmode="numeric" value="20"></div>
+    </div>
+    <div class="row">
+      <button class="btn primary" type="button" id="rs-sim-apply">Apply</button>
+      <button class="btn" type="button" id="rs-sim-reset">Start over</button>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Check-in</th><th>tagtype</th><th>srcid</th><th>origid</th><th>value</th><th>mtime</th><th>This step</th></tr></thead>
+      <tbody id="rs-sim-rows"></tbody>
+    </table></div>
+  </div>
+
+  <h3 data-draft="s5-5"><span class="sec">§5.5</span>What stops a propagating tag</h3>
+  <ul class="plain">
+    <li>A direct same-tag row, <code>srcid</code> nonzero, stops it whatever that row's time. The time comparison applies only to inherited rows.</li>
+    <li>A cancel for the same tag deletes any propagated row there and keeps the value from that artifact's primary children.</li>
+    <li>A singleton never propagates. Downgraded to a cancel, it blocks just as a <code>-</code> card would.</li>
+  </ul>
+  <p>The draft calls this the complete definition of “propagation until blocked” for the whole document set (§5.5).</p>
+</section>
+
+<section class="prose" id="rs-branch">
+  <h2 data-draft="s6"><span class="sec">§6</span>Branches</h2>
+
+  <h3 data-draft="s6-1"><span class="sec">§6.1</span>The branch of a check-in</h3>
+  <p>Every check-in belongs to exactly one branch. An implementation <span class="req">MUST</span> find it from a <code>tagxref</code> row for the branch tag on that check-in with tagtype above zero; the row's value is the branch name. A check-in with no such row belongs to the default branch (§6.1).</p>
+  <p>That fallback is narrow. In a conforming repository the first check-in of every branch, the initial check-in included, carries the propagating branch tag and a matching propagating <code>sym-&lt;branch&gt;</code> tag, and later check-ins inherit both. Creating a branch <span class="req">MUST</span> create the <code>sym-</code> marker, without which the name would not resolve. A check-in attributed to the default branch only by the fallback is not thereby its resolvable tip or its open leaf (§6.1).</p>
+  <p>The default branch name is the <code>main-branch</code> setting, or <code>trunk</code> when it is unset. An implementation <span class="req">MUST</span> read the setting and <span class="req">MUST NOT</span> assume a fixed string when one is set (§6.1).</p>
+
+  <h3 data-draft="s6-2"><span class="sec">§6.2</span>Creating a branch</h3>
+  <p>A new branch is two propagating cards on its root manifest: <code>*branch</code> with the new name as value, and <code>*sym-&lt;name&gt;</code>. Both propagate under §5, which is how later check-ins inherit the branch (§6.2). The root <span class="req">MUST</span> also cancel the inherited propagating <code>sym-</code> tags with <code>-</code> cards, so it does not carry the parent branch's names alongside its own. The <code>branch new</code> command goes further and cancels every active <code>sym-</code> tag it sees (§6.2).</p>
+  <p>Creation <span class="req">MUST NOT</span> succeed when the name already names an open branch, and the check <span class="req">MUST</span> happen before the root manifest is written. Fossil's own reuse guard is narrower than §9's open-leaf test: it looks for a propagating branch tag with that name and excludes only a singleton closed marker (§6.2).</p>
+
+  <h3 data-draft="s6-3"><span class="sec">§6.3</span>Listing branches</h3>
+  <p>The branch list is derived. Group the <code>tagxref</code> rows where <code>tag.tagname = 'branch'</code> and <code>tagtype &gt; 0</code> by value: each value is a branch, with its greatest <code>event.mtime</code> and the count of its check-ins (§6.3).</p>
+  <div class="tool wide" data-nosearch data-rs-table="branch" data-title="Branches, grouped from tagxref" id="rs-t-branch"></div>
+  <p>The listing's open or closed column checks only the branch's representative check-in, the member with the greatest <code>event.mtime</code>. That can disagree with §9, which calls a branch open when any open leaf remains. If the newest check-in is closed while an older leaf is still open, the listing says closed and §9 says open. The draft says neither is in error: they answer different questions (§6.3). The list can be filtered by state, private status, name glob and merged status, and ordered by name or time (§6.3).</p>
+
+  <h3 data-draft="s6-4"><span class="sec">§6.4</span>The current branch of a checkout</h3>
+  <p>Some Fossil code paths read the branch tag's value on a checkout without the <code>tagtype &gt; 0</code> filter. The draft calls this a textual inconsistency, not a second rule. A conforming implementation <span class="req">MUST</span> apply the filter everywhere, including when it reports a checkout's current branch (§6.4).</p>
+</section>
+
+<section class="prose" id="rs-leaves">
+  <h2 data-draft="s7"><span class="sec">§7</span>Leaves</h2>
+
+  <h3 data-draft="s7-1"><span class="sec">§7.1</span>The leaf table</h3>
+  <p>A leaf is a check-in with no child on the same branch. The set can be computed by joining <code>plink</code> and <code>tagxref</code>, but implementations keep it in a <code>leaf</code> table of one integer column. The table carries no open or closed flag; that is derived separately (§7.1).</p>
+
+  <h3 data-draft="s7-2"><span class="sec">§7.2</span>The normative test</h3>
+  <p>A check-in is a leaf if and only if no <code>plink</code> row naming it as parent has a child on the same branch. The test <span class="req">MUST NOT</span> distinguish primary from merge links: a same-branch child reached only by a merge still makes its parent a non-leaf (§7.2). A narrower primary-only child count <span class="req">MAY</span> exist for other uses, and documentation calling it “zero children of any kind” <span class="req">MUST NOT</span> be read as the leaf test (§7.2).</p>
+
+  <h3 data-draft="s7-3"><span class="sec">§7.3</span>Keeping the table right</h3>
+  <ul class="plain">
+    <li><b>Full rebuild.</b> Recompute the table from every check-in, dropping those with a same-branch child. A check-in with no parent at all is included when it has no same-branch child. Fossil's <code>leaf_rebuild()</code> takes candidates from <code>plink</code> child ids, so this is a deliberate normalisation. Reserve it for explicit rebuilds.</li>
+    <li><b>Incremental check.</b> For one check-in: remove it if it has a same-branch child, otherwise insert it, tolerating a row already present.</li>
+    <li><b>Deferred scheduling.</b> When a parent link is created or a branch tag applied or propagated, schedule a recheck of the check-in and each of its direct parents.</li>
+    <li><b>Batch application.</b> Run every scheduled recheck and clear the schedule before the table is trusted. A commit's leaf changes become visible here.</li>
+  </ul>
+
+  <h3 data-draft="s7-4"><span class="sec">§7.4</span>Open and closed</h3>
+  <p>A leaf is open if and only if it is in the leaf table and has no active <code>closed</code> row, meaning a <code>tagxref</code> row for the closed tag whose type is an assignment. Implementations <span class="req">MUST</span> offer the test as an existence expression, which callers can negate to select open leaves, and as a check on one check-in (§7.4).</p>
+  <div class="tool wide" data-nosearch data-rs-table="leaf" data-title="leaf, with branch and closed status" id="rs-t-leaf"></div>
+
+  <h3 data-draft="s7-5"><span class="sec">§7.5</span>More than one open leaf</h3>
+  <p>The open leaves of a branch are the leaf-table members that are not closed and share the branch. To decide whether a check-in is an <i>ambiguous</i> leaf, an implementation <span class="req">MUST</span> first confirm it is a leaf, and if so test for at least one other open leaf on the same branch. The test reads the leaf table, so a table that has drifted gives wrong answers even when <code>plink</code> is correct (§7.5). A report of ambiguity <span class="req">SHOULD</span> list every open leaf on the branch, newest first, with hash, time and rid, and mark the one the checkout is on (§7.5).</p>
+
+  <h3 data-draft="s7-6"><span class="sec">§7.6</span>When to re-evaluate</h3>
+  <p>Leaf status <span class="req">MUST</span> be re-evaluated when a branch tag is applied directly to a check-in, and for every descendant that gains or loses a propagating branch tag. Both go through the deferred schedule (§7.6).</p>
+
+  <h3 data-draft="s7-7"><span class="sec">§7.7</span>Leaves are not names</h3>
+  <p>Leaf enumeration asks which check-ins have no same-branch descendant and whether any are open. Name resolution asks what a name refers to. A resolver <span class="req">MAY</span> consult the leaf table, but the leaf table's rules <span class="req">MUST NOT</span> be conflated with a resolver's precedence rules (§7.7).</p>
+</section>
+
+<section class="prose" id="rs-names">
+  <h2 data-draft="s8"><span class="sec">§8</span>Resolving a name</h2>
+
+  <h3 data-draft="s8-1"><span class="sec">§8.1</span>One name, one check-in</h3>
+  <p>Name resolution turns a branch name, tag name or reserved keyword into a single check-in: the one carrying the active tag with the greatest <code>event.mtime</code>. It answers even when that check-in is closed, not a leaf, or both (§8.1).</p>
+
+  <h3 data-draft="s8-2"><span class="sec">§8.2</span>The rule</h3>
+  <p>For a plain name N, resolution <span class="req">MUST</span> pick the check-in with an active <code>sym-N</code> tag and the greatest <code>event.mtime</code>. This is the last fallback, and it either succeeds or fails outright. Closed status and leaf status <span class="req">MUST NOT</span> affect the choice: the query joins tag, tagxref and event data and nothing else (§8.2).</p>
+  <p>An implementation <span class="req">MAY</span> first look at only the thirty most recently modified candidates, provided the result is identical to a full scan. When two candidates share the greatest time exactly, the query engine's row order decides and the result is implementation-defined (§8.2).</p>
+  <p>Type a branch or tag name. The tool runs the §8.2 query and, beside it, the §9 open-leaf query for the same name, so you can see when the two questions part.</p>
+  <div class="tool wide" data-nosearch id="rs-resolve">
+    <div class="tool-h"><b>Resolve a name</b><span id="rs-resolve-status"></span></div>
+    <div class="row">
+      <div class="field"><label for="rs-resolve-name">Name</label><input id="rs-resolve-name" value="trunk" spellcheck="false"></div>
+    </div>
+  </div>
+
+  <h3 data-draft="s8-3"><span class="sec">§8.3</span>The order of forms</h3>
+  <p>Before the plain-name rule, resolution tries these, in order (§8.3):</p>
+  <div class="tbl-wrap wide"><table>
+    <thead><tr><th>Form</th><th>Resolves to</th></tr></thead>
+    <tbody>
+      <tr><td><code>rid:</code>DIGITS</td><td>That rid, optionally checked against its recorded type. Undocumented.</td></tr>
+      <tr><td><code>tag:</code>NAME</td><td>The §8.2 rule, skipping any attempt to read NAME as a hash.</td></tr>
+      <tr><td><code>tip</code></td><td>The check-in with the greatest <code>event.mtime</code>, regardless of tags.</td></tr>
+      <tr><td><code>current</code></td><td>The open checkout. Only when one is open.</td></tr>
+      <tr><td><code>prev</code>, <code>previous</code></td><td>The checkout's primary parent.</td></tr>
+      <tr><td><code>next</code></td><td>A child of the checkout, primary links first, then latest <code>plink.mtime</code>.</td></tr>
+      <tr><td><code>ckout</code></td><td>A placeholder for the working checkout itself, when the caller accepts one.</td></tr>
+      <tr><td><code>root:</code>BR</td><td>Resolve BR, then the parent-branch check-in BR diverged from.</td></tr>
+      <tr><td><code>start:</code>BR</td><td>Resolve BR, then the earliest check-in on its branch.</td></tr>
+      <tr><td><code>merge-in:</code>BR</td><td>Resolve BR, then the most recent merge-in point on the branch it diverged from.</td></tr>
+      <tr><td>Dates</td><td>The latest event at or before an upper bound, below.</td></tr>
+      <tr><td>Hex, 4 chars up to a full hash</td><td>The artifact with that hash prefix. Two or more matches <span class="req">MUST</span> be rejected as ambiguous (rid −1), never picked silently.</td></tr>
+      <tr><td>Anything else</td><td>The plain-name rule.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Date forms are <code>date:</code>TIMESTAMP, a bare date-time, the deprecated <code>utc:</code>, and NAME<code>:</code>TIMESTAMP, which limits candidates to check-ins with an active <code>sym-NAME</code>. Each finds the latest event whose mtime is at or below an upper bound built from the input (§8.3):</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Input precision</th><th>Upper bound</th></tr></thead>
+    <tbody>
+      <tr><td>Date only</td><td class="num">YYYY-MM-DD 23:59:59.999</td></tr>
+      <tr><td>Minute</td><td class="num">YYYY-MM-DD HH:MM:59.999</td></tr>
+      <tr><td>Second</td><td class="num">YYYY-MM-DD HH:MM:SS.999</td></tr>
+      <tr><td>Fraction <code>.1</code></td><td class="num">.200</td></tr>
+      <tr><td>Fraction <code>.12</code></td><td class="num">.130</td></tr>
+      <tr><td>Fraction <code>.123</code></td><td class="num">.124</td></tr>
+      <tr><td>Fraction <code>.999</code></td><td class="num">.999</td></tr>
+    </tbody>
+  </table></div>
+  <p>A fraction is padded to three digits with 9s and, unless it is already .999, advanced by one millisecond. The deprecated <code>local:</code> form skips the expansion and hands its text to <code>julianday()</code>. A portable timestamp <span class="req">MUST</span> use <code>YYYY-MM-DDTHH:MM:SS[.fraction]Z</code>. Fossil also takes 8, 12 or 14 digits with an optional Z, and hyphenated forms its SQLite parser accepts; other SQLite syntax <span class="req">MUST NOT</span> be treated as portable. Without a Z, the time is read as UTC or local according to Fossil's display setting (§8.3).</p>
+  <p>If nothing matches and the name ends in exactly one punctuation character, resolution <span class="req">MUST</span> retry without it, so a name lifted from prose or a URL still resolves. A request for a branch type is rewritten to check-in type, and the result is moved to the branch's first check-in by the branch walk (§8.3).</p>
+
+  <h3 data-draft="s8-4"><span class="sec">§8.4</span>The branch walk</h3>
+  <p><code>root:</code>, <code>start:</code>, <code>merge-in:</code> and branch-type requests share one walk: from the resolved check-in, follow primary parents toward the root, watching whether each ancestor still carries the same active branch tag. “Earliest still on branch” returns the last ancestor that does; “first ancestor off branch” returns the first that does not. It is a parentage walk, not another tag-and-mtime selection (§8.4).</p>
+
+  <h3 data-draft="s8-5"><span class="sec">§8.5</span>When the name and the leaves disagree</h3>
+  <p>Take a branch BR with an open, childless C1 at time T1, and a later C2 at T2 that is closed but carries the active <code>sym-BR</code>. Resolving BR <span class="req">MUST</span> return C2. Open-leaf enumeration skips C2 and surfaces C1. Callers <span class="req">MUST NOT</span> substitute one question for the other (§8.5). Section 10.2 shows this happening in a real repository.</p>
+</section>
+
+<section class="prose" id="rs-trunk">
+  <h2 data-draft="s9"><span class="sec">§9</span>Current trunk and forks</h2>
+  <p>The current trunk is the <code>main-branch</code> name run through §8, with no special case. The setting is local: not an artifact and never synchronised. Everything after the name is artifact-derived, so current-trunk is a function of the artifact set and the local setting together. Two repositories with identical artifacts can disagree on it (§9).</p>
+  <p>A branch <span class="req">MAY</span> have more than one leaf, and is then <b>forked</b>. Resolution against a forked branch neither refuses nor raises an ambiguity error; it returns the candidate with the greatest mtime (§9).</p>
+  <p>Whether a branch is open is a separate question. A check-in is the branch's open leaf, and implementations <span class="req">MUST</span> treat it as such, only when all three hold (§9):</p>
+  <ul class="plain">
+    <li>it carries an active branch tag whose value is the branch name;</li>
+    <li>it is in the leaf table;</li>
+    <li>it has no active closed tag.</li>
+  </ul>
+  <p>A branch is reported open, with an open-as-of date and a short id, exactly when such a check-in exists. If a report must name one of several open leaves it <span class="req">MUST</span> pick the one with the greatest mtime (§9).</p>
+  <p>A branch's merge target is read by following at most one <code>plink</code> edge from its representative check-in to a child and taking that child's active branch value. A branch has at most one merge target. When the representative has several children, the draft leaves the choice implementation-defined (§9).</p>
+  <p>Ties are left open on purpose. When candidates share the greatest mtime to full precision, an implementation <span class="req">MAY</span> return any of them, callers <span class="req">MUST NOT</span> rely on which, and two implementations <span class="req">MAY</span> differ. The draft declines to add a tie-break by hash or id (§9).</p>
+</section>
+
+<section class="prose" id="rs-example">
+  <h2 data-draft="s10"><span class="sec">§10</span>Worked example: a fork with a closed leaf</h2>
+  <p>Two repository states in which <code>leaves</code> and name resolution see the same graph differently. In both, closed status filters the default leaves view but does not change what <code>whatis</code> and <code>update</code> pick for trunk (§10).</p>
+
+  <h3 data-draft="s10-1"><span class="sec">§10.1</span>The closed leaf is the older one</h3>
+  <p>Trunk forks after <code>c4</code>, leaving two trunk leaves and one feature leaf. <code>leaves</code> lists the open trunk leaf <code>4167aef42f</code> and the open feature leaf <code>210d9276e4</code> and omits the closed trunk leaf <code>7aa867c048</code>. <code>leaves --all</code> adds it back. The closed check-in is still a leaf and still on trunk. <code>whatis trunk</code> and <code>update trunk</code> both give <code>4167aef42f</code>. Closed status changed the leaf list but not what trunk resolves to (§10.1).</p>
+
+  <h3 data-draft="s10-2"><span class="sec">§10.2</span>The closed leaf is the newer one</h3>
+  <!--FIG:rs-resolution-->
+  <p>Now the open leaf <code>b05cbea82b</code> is older than its closed sibling <code>ee3a7eed71</code>. <code>leaves</code> lists only <code>b05cbea82b</code>; <code>leaves --all</code> lists both, newer first. Yet <code>whatis trunk</code> reports <code>ee3a7eed71</code>, and <code>update trunk</code> moves the checkout from <code>b05cbea82b</code> to <code>ee3a7eed71</code> (§10.2).</p>
+
+  <h3 data-draft="s10-3"><span class="sec">§10.3</span>What follows</h3>
+  <p>Tooling that needs the target of <code>update</code> or <code>whatis</code> <span class="req">MUST</span> resolve the name directly, not infer it from <code>leaves</code> output (§10.3).</p>
+</section>
+
+<section class="prose" id="rs-security">
+  <h2 data-draft="s11"><span class="sec">§11</span>Security considerations</h2>
+  <ul class="plain">
+    <li>Crosslink state is computed locally and is never transmitted, negotiated or authenticated on its own. Tag and parent claims are whatever the artifact's producer asserted, so the state is only as trustworthy as the artifacts admitted (§11).</li>
+    <li>Implementations <span class="req">MUST</span> treat it as derived data with no trust of its own, and <span class="req">MUST NOT</span> give a tag or parent claim more weight than artifact admission already gave it. Crosslink state from an artifact that admission would reject <span class="req">MUST</span> be rejected or discarded (§11).</li>
+    <li>The trust boundary is artifact admission, so the draft adds no separate mechanism. Weak admission checks weaken the derived view; correct ones bound it (§11).</li>
+    <li>Implementations <span class="req">SHOULD</span> recompute the state from the admitted artifacts instead of caching it across changes, so a rejected or retracted artifact drops out without separate revocation logic (§11).</li>
+  </ul>
+</section>
+
+<section class="prose" id="rs-iana">
+  <h2 data-draft="s12"><span class="sec">§12</span>IANA considerations</h2>
+  <p>None (§12).</p>
+</section>

@@ -1,0 +1,14 @@
+{
+  // Assets-only Worker: Cloudflare serves the built site directly, no script.
+  // `wrangler deploy` runs the build first, into dist/.
+  "name": "illustrated-fossil-rfc",
+  "compatibility_date": "2026-09-28",
+  "build": { "command": "node build.js dist" },
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "extents": "§4.1.1, §9 · the bytes a signed artifact's name, card parse and Z checksum each cover",
+  "merge": "§8.2, A.4 · rebuilding a delta manifest's file set from its baseline"
+}

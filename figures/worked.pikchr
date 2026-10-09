@@ -1,0 +1,35 @@
+margin = 0.15in
+boxht = 0.5
+$gap = 0.5
+$c1 = 1.15
+$c2 = 1.45
+$c3 = 1.1
+$c4 = 2.15
+
+# Target: one column per segment, in output order.
+COPY_35: box "copy" bold "35 bytes" small wid $c1
+LIT_12: box "literal" bold "12 bytes" small wid $c2 fill 0x0C0003
+COPY_59: box "copy" bold "59 bytes" small wid $c3
+LIT_45: box "literal" bold "45 bytes" small wid $c4 fill 0x0C0003
+
+# Source above, each run over the column it fills.
+SRC_HEAD: box "0–34" bold "35 bytes" small wid $c1 with .s at COPY_35.n + (0, $gap)
+SRC_DOG: box "35–42" bold "unused" small wid $c2 dashed
+SRC_TAIL: box "43–101" bold "59 bytes" small wid $c3
+
+# Delta below, each instruction under the column it writes.
+HDR: box "2N↵" mono bold "header" small wid 0.55 with .nw at COPY_35.sw + (0, -$gap)
+OP_Z: box "Z@0," mono bold "copy" small wid $c1 - 0.55
+OP_C: box "C:sleeping fox" mono bold "literal" small wid $c2 fill 0x0C0003
+OP_W: box "w@g," mono bold "copy" small wid $c3
+OP_I: box "i: An example…" mono bold "literal" small wid $c4 - 0.8 fill 0x0C0003
+SUM: box "2P4rrX;" mono bold "trailer" small wid 0.8
+
+text "source" small rjust at SRC_HEAD.w - (0.12, 0)
+text "target" small rjust at COPY_35.w - (0.12, 0)
+text "delta" small rjust at HDR.w - (0.12, 0)
+
+arrow from SRC_HEAD.s to COPY_35.n
+arrow from SRC_TAIL.s to COPY_59.n
+arrow from (LIT_12.x, OP_C.n.y) to LIT_12.s
+arrow from (LIT_45.x, OP_I.n.y) to LIT_45.s

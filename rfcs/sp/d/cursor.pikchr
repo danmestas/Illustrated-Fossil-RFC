@@ -1,0 +1,21 @@
+margin = 0.15in
+boxht = 0.45
+boxwid = 0.7
+
+# The server's blob table by RID. RID 4 is a gap.
+RID_1: box "1" bold fill 0x0C0003
+RID_2: box "2" bold
+RID_3: box "3" bold
+RID_4: box "4" bold dashed
+RID_5: box "5" bold
+RID_6: box "6" bold fill 0x0C0003
+RID_7: box "7" bold
+RID_8: box "8" bold
+text "RID" small rjust at RID_1.w - (0.12, 0)
+
+# Each round's range, bracketed below.
+$by = RID_1.s.y - 0.18
+line from (RID_1.w.x + 0.04, RID_1.s.y - 0.06) down 0.12 then right until even with RID_5.e - (0.04, 0) then up 0.12
+line from (RID_6.w.x + 0.04, RID_6.s.y - 0.06) down 0.12 then right until even with RID_8.e - (0.04, 0) then up 0.12
+text "clone 3 1" mono bold "cfile 1–3 and 5, clone_seqno 6" small at ((RID_1.w.x + RID_5.e.x) / 2, $by - 0.24)
+text "clone 3 6" mono bold "cfile 6–8, clone_seqno 0" small at ((RID_6.w.x + RID_8.e.x) / 2, $by - 0.24)

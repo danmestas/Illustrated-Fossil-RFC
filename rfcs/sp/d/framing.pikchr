@@ -1,0 +1,18 @@
+margin = 0.15in
+boxht = 0.5
+$c1 = 1.55
+$c2 = 2.0
+$c3 = 0.55
+$c4 = 1.45
+$gap = 0.35
+
+# A file card: its payload ends at the count, LF and all.
+FILE_CARD: box "file H 26↵" mono bold "card line" small wid $c1
+FILE_BODY: box "payload" bold "26 bytes, LF allowed inside" small wid $c2 + $c3 fill 0x0C0003
+FILE_NEXT: box "gimme H↵" mono bold "next card" small wid $c4
+
+# A cfile card on the same grid, padded when its payload lacks a final LF.
+CFILE_CARD: box "cfile H U C↵" mono bold "card line" small wid $c1 with .nw at FILE_CARD.sw + (0, -$gap)
+CFILE_BODY: box "payload" bold "C compressed bytes" small wid $c2 fill 0x0C0003
+CFILE_PAD: box "↵" mono bold "pad" small wid $c3 dashed
+CFILE_NEXT: box "igot H↵" mono bold "next card" small wid $c4

@@ -1,0 +1,13 @@
+{
+  "name": "illustrated-fossil-rfc",
+  "private": true,
+  "license": "0BSD",
+  "scripts": {
+    "build": "node build.js dist",
+    "build:artifact": "node build.js --target artifact dist-artifact",
+    "test": "node --test tests/*.test.mjs",
+    "start": "npm run build && python3 -m http.server 8790 --bind 127.0.0.1 --directory dist",
+    "deploy": "npx --yes wrangler@4.138.0 deploy",
+    "dev:worker": "npx --yes wrangler@4.138.0 dev"
+  }
+}

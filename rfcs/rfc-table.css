@@ -1,0 +1,9 @@
+/* Bordered tables from the draft text, rendered by rfc-render.js. */
+.rfc .rfc-tablewrap { margin: 16px 0 6px; max-width: 100%; }
+.rfc .rfc-table { font: 15px/1.5 var(--sans); color: var(--ink); width: auto; min-width: min(100%, 36rem); max-width: 100%; }
+.rfc .rfc-table th, .rfc .rfc-table td { padding: 7px 14px 7px 0; vertical-align: top; overflow-wrap: anywhere; }
+.rfc .rfc-table th:last-child, .rfc .rfc-table td:last-child { padding-right: 0; }
+.rfc .rfc-table th { overflow-wrap: normal; font: 600 13px/1.4 var(--sans); text-transform: none; letter-spacing: 0; color: var(--muted); border-bottom: 1px solid var(--muted); }
+.rfc .rfc-caption { margin: 0 0 22px; font: 13px var(--sans); color: var(--muted); }
+.rfc code { font-family: var(--mono); font-size: 0.86em; overflow-wrap: anywhere; }
+.rfc .rfc-table code { font-size: 0.9em; }

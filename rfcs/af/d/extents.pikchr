@@ -1,0 +1,19 @@
+margin = 0.15in
+boxht = 0.5
+$gap = 0.22
+$c1 = 1.4
+$c2 = 1.6
+$c3 = 1.0
+$c4 = 1.3
+
+# The stored bytes of a signed artifact, left to right.
+HEAD: box "wrapper head" bold "armor, blank line" small wid $c1
+CARDS: box "cards" bold "every card above Z" small wid $c2
+ZCARD: box "Z card" bold "final 35 bytes" small wid $c3
+SIG: box "signature" bold "armor block" small wid $c4
+
+# What each operation reads, on the same column grid.
+NAME: box "name and signature" bold "every stored byte" small wid $c1 + $c2 + $c3 + $c4 with .nw at HEAD.sw + (0, -$gap)
+PARSE: box "card parse" bold "stripped content" small wid $c2 + $c3 with .nw at (CARDS.w.x, NAME.s.y - $gap)
+SUM: box "Z checksum" bold "MD5 of these bytes" small wid $c2 fill 0x0C0003 with .nw at (CARDS.w.x, PARSE.s.y - $gap)
+

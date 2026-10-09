@@ -1,0 +1,28 @@
+margin = 0.15in
+boxht = 0.5
+boxwid = 0.8
+$gap = 0.3
+$drop = 0.45
+
+# Trunk: five check-ins on one primary-parent chain.
+C1: box "c1" bold "direct" small fill 0x0C0003
+C2: box "c2" bold "inherited" small with .w at C1.e + ($gap, 0)
+C3: box "c3" bold "inherited" small with .w at C2.e + ($gap, 0)
+C4: box "c4" bold "inherited" small with .w at C3.e + ($gap, 0)
+C5: box "c5" bold "inherited" small with .w at C4.e + ($gap, 0)
+
+# Feature: rooted on c2, merged back into c5.
+F1: box "f1" bold "direct" small fill 0x0C0003 with .n at C3.s + (0, -$drop)
+F2: box "f2" bold "inherited" small with .n at C4.s + (0, -$drop)
+
+text "trunk" small rjust at C1.w - (0.12, 0)
+text "feature" small rjust at (C1.w.x - 0.12, F1.y)
+
+arrow from C1.e to C2.w
+arrow from C2.e to C3.w
+arrow from C3.e to C4.w
+arrow from C4.e to C5.w
+arrow from F1.e to F2.w
+arrow from C2.s down until even with F1 then to F1.w
+arrow from F2.e right until even with C5 then to C5.s dashed
+text "merge" small ljust at (C5.x + 0.1, (F2.y + C5.s.y) / 2)

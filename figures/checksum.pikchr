@@ -1,0 +1,19 @@
+margin = 0.15in
+boxht = 0.5
+boxwid = 0.55
+
+# The last whole word, and the tail padded to a word.
+W_A: box "20" mono bold
+box "74" mono bold
+box "61" mono bold
+W_D: box "69" mono bold
+move 0.8
+T_A: box "6C" mono bold fill 0x0C0003
+box "2E" mono bold fill 0x0C0003
+box "0A" mono bold fill 0x0C0003
+PAD: box "00" mono bold dashed
+
+text "word 36" bold "“ tai”" small at ((W_A.w.x + W_D.e.x) / 2, W_A.n.y + 0.27)
+text "tail" bold "“l.↵” and one zero" small at ((T_A.w.x + PAD.e.x) / 2, T_A.n.y + 0.27)
+text "0x20746169" mono at ((W_A.w.x + W_D.e.x) / 2, W_A.s.y - 0.22)
+text "0x6C2E0A00" mono at ((T_A.w.x + PAD.e.x) / 2, T_A.s.y - 0.22)

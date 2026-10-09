@@ -1,0 +1,2099 @@
+<title>The Fossil RFCs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;1,7..72,400&display=swap">
+<style>
+/* Layout: a sticky contents-and-search rail on the left, one reading column on the right whose figures and tools may run wider than the prose. */
+:root {
+  --bg: #F6F7F5;
+  --panel: #FFFFFF;
+  --ink: #1B2326;
+  --muted: #5A666B;
+  --rule: #DCE1DE;
+  --copy: #0E6B64;
+  --copy-tint: #DCEDE9;
+  --lit: #94500E;
+  --lit-tint: #F3E7D6;
+  --frame: #4842A3;
+  --frame-tint: #E6E5F5;
+  --bad: #A8322B;
+  --bad-tint: #F6E1DE;
+  --mark: #FFE38A;
+  --mark-ink: #1B2326;
+  --display: "Literata", Georgia, "Times New Roman", serif;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --rail: 272px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101517; --panel: #161D20; --ink: #DCE3E5; --muted: #95A3A8; --rule: #283337;
+    --copy: #63C6BC; --copy-tint: #16302D; --lit: #E7A660; --lit-tint: #3A2B1B;
+    --frame: #ABA6F2; --frame-tint: #232246; --bad: #F08A80; --bad-tint: #3B1E1B;
+    --mark: #6E5B13; --mark-ink: #FFF6D6; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101517; --panel: #161D20; --ink: #DCE3E5; --muted: #95A3A8; --rule: #283337;
+  --copy: #63C6BC; --copy-tint: #16302D; --lit: #E7A660; --lit-tint: #3A2B1B;
+  --frame: #ABA6F2; --frame-tint: #232246; --bad: #F08A80; --bad-tint: #3B1E1B;
+  --mark: #6E5B13; --mark-ink: #FFF6D6; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-padding-top: 24px; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.62 var(--sans); -webkit-font-smoothing: antialiased; }
+a { color: var(--copy); text-underline-offset: 2px; }
+code, kbd, .mono { font-family: var(--mono); font-size: 0.9em; }
+:focus-visible { outline: 1px solid var(--frame); outline-offset: 2px; }
+
+.shell { display: grid; grid-template-columns: var(--rail) minmax(0, 1fr); min-height: 100vh; }
+
+/* Rail */
+.rail { position: sticky; top: env(safe-area-inset-top, 0px); height: 100vh; display: flex; flex-direction: column; border-right: 1px solid var(--rule); background: var(--panel); }
+.rail-head { padding: 22px 20px 14px; display: grid; gap: 12px; border-bottom: 1px solid var(--rule); }
+.rail-title { font: 600 15px/1.3 var(--display); margin: 0; }
+.rail-title small { display: block; font: 12px/1.4 var(--mono); color: var(--muted); margin-top: 2px; }
+.search { position: relative; }
+.search input { width: 100%; font: 14px var(--sans); color: var(--ink); background: var(--bg); border: 1px solid var(--rule); border-radius: 8px; padding: 9px 56px 9px 32px; }
+.search input:focus { outline: none; border-color: var(--frame); }
+.search svg { position: absolute; left: 10px; top: 50%; translate: 0 -50%; width: 15px; height: 15px; color: var(--muted); }
+.search kbd { position: absolute; right: 9px; top: 50%; translate: 0 -50%; font-size: 11px; color: var(--muted); border: 1px solid var(--rule); border-radius: 4px; padding: 0 5px; background: var(--panel); }
+.search-meta { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); min-height: 24px; }
+.search-meta[hidden] { display: none; }
+.search-meta span { flex: 1; font-variant-numeric: tabular-nums; }
+.search-meta button { font: 12px var(--sans); color: var(--ink); background: var(--bg); border: 1px solid var(--rule); border-radius: 6px; padding: 2px 8px; cursor: pointer; }
+.rail-body { overflow-y: auto; padding: 12px 10px 28px; flex: 1; }
+.results { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 2px; }
+.results a { display: block; padding: 8px 10px; border-radius: 6px; text-decoration: none; color: var(--ink); }
+.results a:hover, .results a.active { background: var(--bg); }
+.results b { display: block; font-size: 13px; font-weight: 600; }
+.results span { display: block; font-size: 12px; color: var(--muted); line-height: 1.45; }
+.results mark { background: var(--mark); color: var(--mark-ink); border-radius: 2px; padding: 0 1px; }
+.results-empty { padding: 8px 10px; font-size: 13px; color: var(--muted); }
+.toc { list-style: none; margin: 0; padding: 0; }
+.toc a { display: flex; gap: 8px; padding: 5px 10px; border-radius: 6px; font-size: 13.5px; line-height: 1.4; color: var(--muted); text-decoration: none; }
+.toc a:hover { color: var(--ink); background: var(--bg); }
+.toc a.here { color: var(--ink); background: var(--bg); font-weight: 500; }
+.toc .sec { font-family: var(--mono); font-size: 11.5px; min-width: 2.4em; color: var(--muted); padding-top: 1px; }
+.toc .sub a { padding-left: 28px; font-size: 13px; }
+.rfc-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.rfc-pick button { font: 13px var(--sans); padding: 6px 0; color: var(--muted); background: transparent; border: 0; cursor: pointer; }
+.rfc-pick button[aria-pressed="true"] { background: var(--frame-tint); color: var(--frame); font-weight: 600; }
+.rfc-pick button:hover { color: var(--ink); }
+.pages { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+/* History and repository */
+.history-bar { display: grid; gap: 6px; padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; font: 14px var(--sans); }
+.hb-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.hb-label { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.hb-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; cursor: pointer; }
+.hb-status { margin: 0; font-size: 12.5px; color: var(--muted); }
+.seg button:disabled { cursor: default; }
+#versionSeg { flex-wrap: wrap; }
+#versionSeg button { white-space: nowrap; }
+.commit-bar { display: grid; grid-template-columns: auto minmax(0, 2fr) minmax(0, 1fr); gap: 10px 14px; align-items: end; padding-top: 10px; border-top: 1px solid var(--rule); }
+.commit-bar[hidden] { display: none; }
+.cb-count { font-size: 13px; font-weight: 600; align-self: center; }
+.cb-actions { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
+.cb-note { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--muted); }
+.cb-note:empty { display: none; }
+@media (max-width: 700px) { .commit-bar { grid-template-columns: minmax(0, 1fr); } }
+#draftBody.history [data-ln]:not(dt), #draftBody.editing [data-ln]:not(dt) { position: relative; }
+.ci-chip { position: absolute; left: calc(100% + 14px); top: 0.2em; white-space: nowrap; font: 500 11.5px/1 var(--sans); border: 0; border-radius: 999px; padding: 5px 9px; cursor: pointer; color: var(--ink); background: var(--bg); }
+.ci-chip .h { font-family: var(--mono); }
+.ci-chip.c0 { background: var(--frame-tint); color: var(--frame); }
+.ci-chip.c1 { background: var(--copy-tint); color: var(--copy); }
+.ci-chip.c2 { background: var(--lit-tint); color: var(--lit); }
+.ci-chip.edit { background: var(--ink); color: var(--panel); }
+.ci-chip[aria-expanded="true"] { background: var(--ink); color: var(--panel); }
+@media (max-width: 1240px) { .ci-chip { position: static; display: inline-block; margin: 0 0 6px; } #draftBody.history [data-ln], #draftBody.editing [data-ln] { position: static; } }
+.hb-drawer { margin: 6px 0 18px; padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; font: 14.5px/1.6 var(--sans); display: grid; gap: 12px; max-width: 74ch; }
+.hb-entry { display: grid; gap: 4px; }
+.hb-entry .meta { font-size: 12.5px; color: var(--muted); }
+.hb-entry .meta .h { font-family: var(--mono); color: var(--frame); }
+.hb-entry .words { white-space: pre-wrap; }
+.hb-entry del { background: var(--bad-tint); color: var(--bad); text-decoration: line-through; border-radius: 3px; }
+.hb-entry ins { background: var(--copy-tint); color: var(--copy); text-decoration: none; border-radius: 3px; }
+.hb-origin { font-size: 12.5px; color: var(--muted); margin: 0; }
+.block-editor { display: grid; gap: 8px; margin: 6px 0 18px; }
+.block-editor textarea { font: 13.5px/1.5 var(--mono); color: var(--ink); background: var(--panel); border: 1px solid var(--frame); border-radius: 8px; padding: 10px 12px; width: 100%; resize: vertical; white-space: pre; overflow-x: auto; }
+.block-editor .row { gap: 8px; }
+.block-editor small { color: var(--muted); font: 12.5px var(--sans); }
+[data-pending] { background: var(--lit-tint); border-radius: 4px; }
+#draft.blame [data-ci-new] { background: var(--frame-tint); border-radius: 4px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+#draft.blame li[data-ci-new], #draft.blame dd[data-ci-new] { padding-inline: 4px; }
+#draft.blame p[data-ci-new], #draft.blame pre[data-ci-new] { padding: 2px 6px; margin-inline: -6px; }
+.repo-card { display: grid; gap: 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 18px; }
+.repo-facts { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; font-size: 13.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.repo-facts b { color: var(--ink); font-weight: 600; }
+.dl-note { font-size: 13px; color: var(--muted); flex: 1 1 240px; }
+.tl { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.tl li { position: relative; }
+.tl button { display: grid; grid-template-columns: 22px auto minmax(0, 1fr); gap: 4px 12px; align-items: baseline; width: 100%; text-align: left; font: 14px var(--sans); color: var(--ink); background: transparent; border: 0; border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+.tl button:hover { background: var(--bg); }
+.tl button[aria-pressed="true"] { background: var(--frame-tint); }
+.tl .dot { width: 11px; height: 11px; border-radius: 50%; background: var(--frame); align-self: center; justify-self: center; }
+.tl li:not(:last-child)::after { content: ""; position: absolute; left: 20px; top: 26px; bottom: -14px; width: 1px; background: var(--rule); }
+.tl .hash { font: 13px var(--mono); color: var(--frame); }
+.tl .when { font-size: 12.5px; color: var(--muted); grid-column: 3; }
+.tl .msg { grid-column: 3; grid-row: 1; }
+.tl-empty { font-size: 14px; color: var(--muted); padding: 8px 10px; }
+.manifest { display: grid; gap: 0; font: 13px/1.5 var(--mono); }
+.manifest .card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 15em); gap: 14px; padding: 5px 10px; border-top: 1px solid var(--rule); }
+.manifest .card code { white-space: pre-wrap; word-break: break-all; }
+.manifest .card span { font: 12.5px/1.45 var(--sans); color: var(--muted); }
+.manifest .card b { font: 600 13px var(--mono); color: var(--frame); }
+.names-table td, .rebuild-table td { vertical-align: top; }
+.names-table .hash { font-family: var(--mono); font-size: 12.5px; word-break: break-all; }
+.names-table .cards { font-family: var(--mono); letter-spacing: 0.08em; }
+.mark-ok { color: var(--copy); font-weight: 600; }
+.mark-bad { color: var(--bad); font-weight: 600; }
+.rebuild-table .diffs { display: grid; gap: 4px; font-size: 13px; }
+.rebuild-table .diffs code { font-size: 12px; }
+.rebuild-table tr.pending td { color: var(--muted); }
+.rebuild-note { margin: 0; font-size: 14px; color: var(--muted); max-width: 72ch; }
+.rebuild-note:empty { display: none; }
+.sync-tool { gap: 16px; }
+.sync-controls { gap: 10px; }
+.sync-progress { margin-left: auto; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sync-stage { position: relative; color: var(--ink); min-height: 220px; display: grid; place-items: center; overflow-x: auto; }
+.sync-stage svg { display: block; width: 100%; max-width: var(--pk-w, 100%); height: auto; }
+.sync-stage svg text { font-family: var(--sans); }
+.sync-stage svg text[font-family="monospace"] { font-family: var(--mono); }
+.sync-stage .placeholder { font-size: 14px; color: var(--muted); }
+.sync-stage svg .cell-new { transition: fill-opacity .6s ease; }
+.sync-legend { margin: -6px 0 0; justify-content: center; }
+.sync-legend i { border-radius: 2px; }
+.lg-solid { border: 1px solid var(--ink); }
+.lg-dashed { border: 1px dashed var(--muted); }
+.lg-new { background: var(--lit-tint); border: 1px solid var(--ink); }
+.sync-msg { display: grid; gap: 10px; }
+.sync-msg:empty { display: none; }
+.sync-msg .mh { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; font-size: 14px; }
+.sync-msg .mh b { font-size: 15px; }
+.sync-msg .mh span { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.sync-msg table { font-size: 14px; }
+.sync-msg td.card { font-family: var(--mono); font-weight: 600; white-space: nowrap; }
+.sync-msg td.sec { font-family: var(--mono); color: var(--muted); white-space: nowrap; }
+.sync-msg details summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.sync-msg pre { margin: 8px 0 0; font: 12.5px/1.55 var(--mono); background: var(--bg); border-radius: 8px; padding: 10px 12px; max-height: 260px; overflow: auto; }
+.diff { max-height: 560px; overflow: auto; background: var(--bg); border-radius: 8px; font: 12.5px/1.5 var(--mono); padding: 8px 0; }
+.diff div { white-space: pre; padding: 0 12px; min-width: max-content; }
+.diff .add { background: var(--copy-tint); color: var(--copy); }
+.diff .del { background: var(--bad-tint); color: var(--bad); }
+.diff .hunk { color: var(--frame); padding-top: 8px; }
+.diff .meta { color: var(--muted); }
+.bar { display: block; height: 4px; border-radius: 2px; background: var(--copy); margin-top: 4px; }
+@media (max-width: 900px) { .manifest .card { grid-template-columns: minmax(0, 1fr); gap: 2px; } }
+.pages button { font: 13px var(--sans); padding: 6px 0; color: var(--muted); background: transparent; border: 0; cursor: pointer; }
+.pages button[aria-pressed="true"] { background: var(--bg); color: var(--ink); font-weight: 500; }
+.pages button:hover { color: var(--ink); }
+.to-other { display: inline-block; margin-left: 12px; vertical-align: 0.25em; font: 500 11.5px/1 var(--sans); letter-spacing: 0.02em; color: var(--muted); text-decoration: none; border: 1px solid var(--rule); border-radius: 999px; padding: 4px 9px; }
+.to-other:hover { color: var(--ink); border-color: var(--muted); }
+.toc-label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 6px 10px; }
+
+/* Mobile bar */
+.topbar { display: none; }
+
+/* Document */
+.doc { padding-block: 48px 120px; padding-inline: clamp(16px, 5vw, 64px); max-width: 1040px; }
+.doc > section, .doc > header { max-width: 940px; }
+.prose > * { max-width: 68ch; }
+.prose > .wide { max-width: none; }
+header.hero { margin-bottom: 56px; }
+.eyebrow { font: 12.5px/1.4 var(--mono); color: var(--muted); letter-spacing: 0.02em; }
+h1 { font: 600 clamp(34px, 5vw, 52px)/1.08 var(--display); margin: 12px 0 14px; text-wrap: balance; letter-spacing: -0.01em; }
+.lede { font-size: 19px; line-height: 1.55; max-width: 60ch; margin: 0 0 28px; }
+h2 { font: 600 28px/1.2 var(--display); margin: 72px 0 6px; text-wrap: balance; scroll-margin-top: 24px; }
+h2 .sec, h3 .sec { font: 500 13px var(--mono); color: var(--muted); margin-right: 10px; vertical-align: 0.3em; }
+h3 { font: 600 19px/1.3 var(--sans); margin: 36px 0 4px; scroll-margin-top: 24px; }
+p { margin: 0 0 14px; }
+.cite { font: 12.5px var(--mono); color: var(--muted); margin: 0 0 18px; }
+ul.plain, ol.plain { padding-left: 1.2em; margin: 0 0 16px; }
+ul.plain li, ol.plain li { margin-bottom: 6px; }
+.req { font: 600 0.78em var(--mono); letter-spacing: 0.04em; color: var(--frame); }
+mark.hit { background: var(--mark); color: var(--mark-ink); border-radius: 2px; }
+mark.hit.cur { background: var(--frame); color: var(--panel); }
+
+/* Byte strips */
+.strip { display: flex; flex-wrap: wrap; gap: 2px; font: 14px/1 var(--mono); }
+.b { display: inline-grid; place-items: center; min-width: 1.35em; height: 1.9em; padding: 0 1px; border-radius: 3px; background: var(--panel); border: 1px solid var(--rule); white-space: pre; }
+.b.frame { background: var(--frame-tint); border-color: transparent; color: var(--frame); }
+.b.copy { background: var(--copy-tint); border-color: transparent; color: var(--copy); }
+.b.lit { background: var(--lit-tint); border-color: transparent; }
+.b.litop { background: var(--lit-tint); border-color: transparent; color: var(--lit); font-weight: 600; }
+.b.ctl { font-size: 11px; color: var(--muted); }
+.b.dim { opacity: 0.35; }
+.b.on { border-color: var(--frame); position: relative; z-index: 1; }
+.b.src-hit { background: var(--copy-tint); color: var(--copy); border-color: transparent; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); margin-top: 12px; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.hero-strip { background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; padding: 18px; }
+.hero-strip .cap { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+.hero-strip .cap b { color: var(--ink); font-weight: 600; }
+.seg-note { margin-top: 12px; font-size: 14px; min-height: 1.6em; }
+.seg-note code { background: var(--bg); padding: 1px 5px; border-radius: 4px; }
+
+/* Figures */
+figure.pk { margin: 24px 0 28px; background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+.pk-view { padding: 20px; overflow-x: auto; color: var(--ink); }
+.pk-view svg { display: block; margin: 0 auto; width: 100%; max-width: var(--pk-w, 100%); height: auto; }
+.pk-view svg text { font-family: var(--sans); }
+.pk-view svg text[font-family="monospace"] { font-family: var(--mono); }
+.pk-src { display: none; margin: 0; padding: 18px 20px; overflow-x: auto; font: 13px/1.55 var(--mono); background: var(--bg); border-top: 1px solid var(--rule); white-space: pre; }
+figure.pk.show-src .pk-src { display: block; }
+figure.pk.show-src .pk-view { display: none; }
+figure.syntax .syntax-view { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 22px 44px; padding: 22px 20px; color: var(--ink); }
+figure.syntax .syntax-rule { max-width: 100%; }
+figure.syntax .syntax-rule svg { display: block; width: var(--pk-w); max-width: 100%; height: auto; }
+figure.syntax .syntax-rule svg text { font-family: var(--sans); }
+figure.syntax .syntax-rule svg text[font-family="monospace"] { font-family: var(--mono); }
+figure.syntax.show-src .syntax-view { display: none; }
+figure.syntax summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 12px 20px; cursor: pointer; font: 14px var(--sans); color: var(--muted); list-style: none; }
+figure.syntax summary::-webkit-details-marker { display: none; }
+figure.syntax summary::before { content: "▸"; color: var(--muted); transition: transform .15s; }
+figure.syntax details[open] > summary::before { transform: rotate(90deg); }
+figure.syntax summary:hover .sf-title { color: var(--ink); }
+figure.syntax summary:focus-visible { outline: 2px solid var(--accent, currentColor); outline-offset: -2px; }
+figure.syntax .sf-title { color: var(--ink); font-weight: 600; }
+figure.syntax .sf-names { font: 12.5px var(--mono); overflow-wrap: anywhere; }
+figure.syntax details[open] > summary { border-bottom: 1px solid var(--rule); }
+@media (prefers-reduced-motion: reduce) { figure.syntax summary::before { transition: none; } }
+.pk-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border-top: 1px solid var(--rule); font-size: 12.5px; color: var(--muted); }
+.pk-bar .cap { flex: 1 1 260px; min-width: 0; }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 7px; overflow: hidden; }
+.seg button, .pk-bar .act { font: 12.5px var(--sans); color: var(--muted); background: transparent; border: 0; padding: 4px 10px; cursor: pointer; text-decoration: none; }
+.seg button[aria-pressed="true"] { background: var(--bg); color: var(--ink); }
+.pk-bar .act { border: 1px solid var(--rule); border-radius: 7px; }
+.pk-bar .act:hover, .seg button:hover { color: var(--ink); }
+
+/* Tables */
+.tbl-wrap { overflow-x: auto; margin: 16px 0 22px; }
+table { border-collapse: collapse; font-size: 14.5px; width: 100%; }
+th, td { text-align: left; padding: 8px 12px 8px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 500; }
+td.num { font-variant-numeric: tabular-nums; font-family: var(--mono); white-space: nowrap; }
+.alpha { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 3px; margin: 16px 0 8px; max-width: 640px; }
+.alpha div { background: var(--panel); border: 1px solid var(--rule); border-radius: 5px; padding: 4px 0 3px; text-align: center; }
+.alpha b { display: block; font: 600 15px var(--mono); }
+.alpha span { display: block; font: 10.5px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+pre.code { margin: 16px 0 22px; padding: 16px 18px; background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; overflow-x: auto; font: 13.5px/1.6 var(--mono); }
+
+/* Tools */
+.tool { margin: 22px 0 28px; background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; padding: 18px; display: grid; gap: 14px; }
+.tool-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.tool-h b { font-size: 14px; }
+.tool-h span { font-size: 12.5px; color: var(--muted); }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.field { display: grid; gap: 5px; min-width: 0; flex: 1 1 220px; }
+.field label { font-size: 12px; color: var(--muted); letter-spacing: 0.03em; }
+.field input, .field textarea { font: 14px/1.5 var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--rule); border-radius: 8px; padding: 8px 10px; width: 100%; resize: vertical; }
+.field input:focus, .field textarea:focus { outline: none; border-color: var(--frame); }
+.btn { font: 500 13.5px var(--sans); color: var(--ink); background: var(--bg); border: 1px solid var(--rule); border-radius: 8px; padding: 7px 14px; cursor: pointer; }
+.btn:hover { border-color: var(--muted); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn.primary { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.digits { display: flex; flex-wrap: wrap; gap: 6px; }
+.digit { background: var(--bg); border-radius: 6px; padding: 6px 9px; font: 13px/1.35 var(--mono); }
+.digit b { font-size: 16px; display: block; }
+.digit span { color: var(--muted); font-size: 11.5px; }
+.readout { font: 14px/1.6 var(--mono); background: var(--bg); border-radius: 8px; padding: 10px 12px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
+.status { display: inline-flex; align-items: center; gap: 6px; font: 600 12px var(--sans); padding: 3px 9px; border-radius: 999px; }
+.status.ok { background: var(--copy-tint); color: var(--copy); }
+.status.bad { background: var(--bad-tint); color: var(--bad); }
+.status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.stats b { color: var(--ink); font-weight: 600; }
+.step-panel { display: grid; gap: 10px; }
+.step-label { font-size: 12px; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.explain { font-size: 15px; min-height: 3.2em; }
+.explain code { background: var(--bg); padding: 1px 5px; border-radius: 4px; }
+.reject-try { font: 12.5px var(--sans); color: var(--copy); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+
+.callout { border: 1px solid var(--rule); background: var(--panel); padding: 12px 16px; border-radius: 8px; margin: 18px 0; font-size: 15px; }
+footer.end { margin-top: 80px; padding-top: 22px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--muted); max-width: 68ch; }
+
+@media (max-width: 900px) {
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  .rail { position: fixed; inset: 0 auto 0 0; width: min(88vw, 340px); z-index: 30; translate: -102% 0; transition: translate .22s ease; box-shadow: 0 0 40px rgba(0,0,0,.18); padding-top: env(safe-area-inset-top, 0px); }
+  .rail.open { translate: 0 0; }
+  .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.28); z-index: 25; }
+  .topbar { display: flex; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; align-items: center; gap: 10px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--rule); }
+  .topbar button { font: 500 14px var(--sans); color: var(--ink); background: var(--bg); border: 1px solid var(--rule); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  .topbar span { font: 600 14px var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .doc { padding-block: 28px 96px; }
+  html { scroll-padding-top: 64px; }
+  h2, h3 { scroll-margin-top: 64px; }
+  .alpha { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) { .rail { transition: none; } html { scroll-behavior: auto; } }
+.rfc { font: 17px/1.66 "Literata", Georgia, serif; }
+.rfc p, .rfc li, .rfc dd { max-width: 68ch; }
+.rfc p { margin: 0 0 14px; }
+.rfc .rfc-h { font-family: var(--display); scroll-margin-top: 24px; }
+.rfc h2.rfc-h { font-size: 26px; margin: 64px 0 14px; }
+.rfc h3.rfc-h { font-size: 20px; margin: 40px 0 10px; }
+.rfc h4.rfc-h { font-size: 17px; margin: 28px 0 8px; }
+.rfc .rfc-h .sec { font: 500 14px var(--mono); color: var(--muted); margin-right: 12px; vertical-align: 0.12em; }
+.rfc pre.rfc-fig { font: 13.5px/1.5 var(--mono); background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 18px; margin: 14px 0 20px; overflow-x: auto; max-width: 100%; width: max-content; }
+.rfc .rfc-list { padding-left: 1.6em; margin: 0 0 16px; }
+.rfc .rfc-list li { margin-bottom: 8px; }
+.rfc .rfc-list .rfc-list { margin-top: 8px; }
+.rfc ul.rfc-list { list-style: disc; }
+.rfc .rfc-dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; margin: 0 0 18px; max-width: 74ch; }
+.rfc .rfc-dl dt { font-weight: 600; }
+.rfc .rfc-dl dd { margin: 0; }
+.rfc .rfc-ref { padding-left: 2em; text-indent: -2em; font-size: 15.5px; }
+.rfc .rfc-addr { font-size: 15.5px; }
+.rfc strong { font-weight: 600; }
+.rfc .req { font: 600 0.8em var(--mono); color: var(--frame); letter-spacing: 0.03em; }
+.doc > header.rfc-top { display: grid; gap: 18px; margin-bottom: 36px; max-width: 68ch; }
+/* The IETF header, spread to the body's measure: left lines, right lines, then the title. */
+.ietf-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 24px; font: 12.5px/1.5 var(--mono); color: var(--muted); }
+.ietf-head .r { text-align: right; }
+.ietf-head .t { grid-column: 1 / -1; text-align: center; }
+.ietf-head .gap { margin-top: 1.5em; }
+.rfc-top pre { font: 12.5px/1.5 var(--mono); color: var(--muted); margin: 0; overflow-x: auto; white-space: pre; }
+.rfc-top h1 { margin: 6px 0 0; }
+.rfc-top .lede { font-size: 16px; margin: 0; color: var(--muted); }
+details.boiler { margin: 24px 0 0; border: 1px solid var(--rule); border-radius: 10px; background: var(--panel); }
+details.boiler summary { cursor: pointer; padding: 10px 16px; font: 500 14px var(--sans); color: var(--muted); }
+details.boiler > div { padding: 4px 18px 8px; }
+@media (max-width: 900px) { .rfc { font-size: 16px; } .rfc .rfc-dl { grid-template-columns: minmax(0, 1fr); } .rfc .rfc-dl dd { margin-bottom: 8px; } }
+/*RFCTABLECSS*/
+</style>
+
+<div class="topbar">
+  <button type="button" id="openRail" aria-controls="rail" aria-expanded="false">Contents &amp; search</button>
+  <span id="topTitle">The Fossil Delta Format</span>
+</div>
+<div class="scrim" id="scrim" hidden></div>
+
+<div class="shell">
+  <aside class="rail" id="rail" aria-label="Contents and search">
+    <div class="rail-head">
+      <p class="rail-title" id="railTitle">The Fossil Delta Format<small>draft-fossil-delta-format-00</small></p>
+      <div class="rfc-pick" role="group" aria-label="RFC"><button type="button" data-rfc="dl" aria-pressed="true">Delta</button><button type="button" data-rfc="af" aria-pressed="false">Artifacts</button><button type="button" data-rfc="rs" aria-pressed="false">Repo state</button><button type="button" data-rfc="sp" aria-pressed="false">Sync</button></div>
+      <div class="pages" role="group" aria-label="View"><button type="button" data-view="doc" aria-pressed="true">Illustrated</button><button type="button" data-view="draft" aria-pressed="false">Draft text</button><button type="button" data-view="repo" aria-pressed="false">Repository</button></div>
+      <div class="search" role="search">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m13 13 4 4"/></svg>
+        <input id="q" type="search" placeholder="Search" autocomplete="off" spellcheck="false" aria-label="Search the document">
+        <kbd>/</kbd>
+      </div>
+      <div class="search-meta" id="searchMeta" hidden>
+        <span id="hitCount"></span>
+        <button type="button" id="prevHit" aria-label="Previous match">↑</button>
+        <button type="button" id="nextHit" aria-label="Next match">↓</button>
+        <button type="button" id="clearQ">Clear</button>
+      </div>
+    </div>
+    <div class="rail-body">
+      <ul class="results" id="results" hidden></ul>
+      <div class="toc-label">Contents</div>
+      <ul class="toc" id="toc"></ul>
+    </div>
+  </aside>
+
+  <main class="doc illus" id="illus-dl" data-rfc="dl">
+    <header class="hero">
+      <div class="eyebrow">draft-fossil-delta-format-00 · an illustrated reading</div>
+      <h1>The Fossil Delta Format</h1>
+      <p class="lede">Fossil stores most versions of a file as a delta: a short recipe that rebuilds one byte sequence from another it resembles. Here is a real one, from the draft's own worked example. These 79 bytes rebuild a 151-byte file.</p>
+      <div class="hero-strip" data-nosearch>
+        <div class="cap"><span><b>The delta</b>, byte by byte. Point at a segment to read it.</span><span>source 102 B · delta 79 B · target 151 B</span></div>
+        <div class="strip" id="heroStrip"></div>
+        <div class="seg-note" id="heroNote">Header, four segments, and a trailer. Nothing else.</div>
+        <div class="legend">
+          <span><i style="background:var(--frame-tint)"></i>header and trailer</span>
+          <span><i style="background:var(--copy-tint)"></i>copy from the source</span>
+          <span><i style="background:var(--lit-tint)"></i>literal bytes carried in the delta</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="prose" id="s1" data-sec="1">
+      <h2><span class="sec">§1–2</span>What a delta is</h2>
+      <p>Over a project's life, most versions of a file differ from the previous one by a few lines. Storing every version whole would waste space, so Fossil stores many of them as deltas. A delta encodes one byte sequence, the <b>target</b>, as instructions for rebuilding it from another, the <b>source</b>.</p>
+      <p>There are two instructions: copy a run of bytes from the source, and insert a run of bytes carried in the delta itself. Where the target shares long runs with the source, the copies make the delta much smaller than the target.</p>
+      <p>A delta does not name its source. The caller supplies the source, and the storage or transfer layer records which source a delta belongs to. Naming stored content and verifying its integrity belongs to the Fossil Artifact Format. This document covers only the delta's bytes and how to apply them.</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td>Source</td><td>The bytes a delta is applied against.</td></tr>
+          <tr><td>Target</td><td>The bytes a delta rebuilds. The delta's header declares its length.</td></tr>
+          <tr><td>Delta</td><td>The bytes that say how to rebuild the target from the source.</td></tr>
+          <tr><td>Segment</td><td>One instruction in a delta: a copy or a literal.</td></tr>
+        </tbody>
+      </table></div>
+      <p>The draft uses <span class="req">MUST</span>, <span class="req">SHOULD</span> and <span class="req">MAY</span> in the BCP 14 sense, and only when capitalised.</p>
+    </section>
+
+    <section class="prose" id="s3" data-sec="3">
+      <h2><span class="sec">§3</span>The shape of a delta</h2>
+      <p>A delta is a header, zero or more segments, and a trailer, written back to back with no separators beyond the bytes each part defines. Every number in it uses the same base-64 integer encoding.</p>
+      <pre class="code wide">header    integer LF                 target length, then 0x0a
+copy      count "@" offset ","       copy count source bytes from offset
+literal   count ":" payload          insert the next count bytes of the delta
+trailer   checksum ";"               32-bit sum of the target</pre>
+      <p>The opcode that follows an integer says what the integer was: <code>@</code> starts a copy, <code>:</code> a literal, <code>;</code> the trailer. A reader never needs to look ahead further than one byte.</p>
+
+      <h3 id="s3-1"><span class="sec">§3.1</span>Integers in base 64</h3>
+      <p>An integer is an unsigned number written in base 64, most significant digit first, with no leading zeros. Zero is the single character <code>0</code>. The 64 digits, in value order:</p>
+      <div class="alpha wide" id="alpha" aria-label="The 64 digits and their values"></div>
+      <p>So <code>0</code>–<code>9</code> are 0–9, <code>A</code>–<code>Z</code> are 10–35, <code>_</code> is 36, <code>a</code>–<code>z</code> are 37–62 and <code>~</code> is 63. A reader takes digits until the first byte that is not one; that byte is the opcode or separator. Bytes 0x80–0xFF are never digits and always end an integer.</p>
+      <div class="tool wide" data-nosearch>
+        <div class="tool-h"><b>Convert an integer</b><span>Type a decimal number or a base-64 string</span></div>
+        <div class="row">
+          <div class="field"><label for="intDec">Decimal</label><input id="intDec" inputmode="numeric" value="2568187297"></div>
+          <div class="field"><label for="intB64">Base 64</label><input id="intB64" value="2P4rrX" spellcheck="false"></div>
+        </div>
+        <div class="digits" id="intDigits"></div>
+        <div class="stats" id="intNote"></div>
+      </div>
+      <p>Producers <span class="req">MUST</span> use the canonical form, and every value they emit <span class="req">MUST</span> be below 2<sup>32</sup>. Decoders are allowed more slack. Fossil as shipped accepts an empty integer (read as zero) and leading zeros (read as their value). A decoder <span class="req">MAY</span> reject either form, and implementations differ. Values at or above 2<sup>32</sup> have no interoperable meaning: a decoder <span class="req">MAY</span> reject them, and one that accumulates in 32 bits will wrap where a wider one will not.</p>
+
+      <h3 id="s3-2"><span class="sec">§3.2</span>The header</h3>
+      <p>The header is the target length as an integer, followed by the byte 0x0a. The decoder reads it first, so it knows how large the output will be before it reads any segment. A decoder <span class="req">MUST</span> reject a delta whose header integer is not immediately followed by 0x0a. In the example, <code>2N</code> is 2 × 64 + 23 = 151.</p>
+
+      <h3 id="s3-3"><span class="sec">§3.3</span>Copy and literal segments</h3>
+      <p><b>Copy</b> is <code>count@offset,</code>. It copies <code>count</code> bytes from the source, starting at the zero-based <code>offset</code>, onto the end of the output. The comma is required. A count of zero copies zero bytes, and encoders <span class="req">MUST NOT</span> emit one. Whether the run lies inside the source is checked when the delta is applied.</p>
+      <p><b>Literal</b> is <code>count:payload</code>. The next <code>count</code> bytes of the delta go straight to the output. The payload is opaque and may contain any byte, including 0x0a. A reader <span class="req">MUST</span> count exactly <code>count</code> bytes past the colon and <span class="req">MUST NOT</span> scan for a separator. The only structural 0x0a in a delta is the one that ends the header.</p>
+
+      <h3 id="s3-4"><span class="sec">§3.4</span>The trailer and its checksum</h3>
+      <p>The delta ends with <code>checksum;</code>. Producers <span class="req">MUST</span> always write the checksum. Decoders <span class="req">MAY</span> verify it, and a decoder that verifies <span class="req">MUST</span> reject a mismatch. A decoder that does not verify still requires the trailer's syntax.</p>
+      <p>The checksum reads the target as big-endian 32-bit words and adds them, wrapping at 2<sup>32</sup>. A tail of one to three bytes is added as if padded with zeros to a whole word: the first tail byte shifted left 24 bits, the second 16, the third 8.</p>
+      <!--FIG:checksum-->
+      <p>For the 151-byte example target, the 37 whole words sum to <code>0x2CE563A1</code>. The tail <code>6C 2E 0A</code> adds <code>0x6C2E0A00</code>, giving <code>0x99136DA1</code>, which is 2568187297 or <code>2P4rrX</code> in base 64: the trailer.</p>
+      <div class="tool wide" data-nosearch>
+        <div class="tool-h"><b>Checksum any text</b><span>UTF-8 bytes, as the trailer would carry them</span></div>
+        <div class="field"><label for="sumIn">Target bytes</label><textarea id="sumIn" rows="3" spellcheck="false"></textarea></div>
+        <div class="stats" id="sumOut"></div>
+      </div>
+      <p>After the trailer the delta is complete. Bytes that follow it in the buffer <span class="req">MAY</span> be ignored.</p>
+    </section>
+
+    <section class="prose" id="s4" data-sec="4">
+      <h2><span class="sec">§4</span>Applying a delta</h2>
+      <p>The reader is given the source bytes and the delta bytes and works through the delta once, front to back:</p>
+      <ol class="plain">
+        <li>Reject a delta that is zero bytes long.</li>
+        <li>Read the header integer as the target length. Reject unless the next byte is 0x0a. Allocate the output and set the position to zero.</li>
+        <li>While delta bytes remain, read an integer and look at the byte after it.
+          <ul class="plain">
+            <li><code>@</code>: read the offset and require a comma. Reject if offset + count exceeds the source, computed without overflow. Reject if the copy would run past the target length. Otherwise copy and advance.</li>
+            <li><code>:</code>: reject if count exceeds the bytes left in the delta, or if the literal would run past the target length. Otherwise copy the payload and advance past it.</li>
+            <li><code>;</code>: reject unless the position equals the target length. If the decoder verifies, check the checksum. The output is the target.</li>
+            <li>Any other byte: reject.</li>
+          </ul>
+        </li>
+        <li>Reject a delta that ends without <code>;</code>.</li>
+      </ol>
+
+      <h3 id="s4-walk"><span class="sec">B.1</span>Step through the worked example</h3>
+      <p>The figure shows where each part of the target comes from. Two runs are copied from the source; the eight bytes <i>lazy dog</i> are never used. The other two runs arrive as literals inside the delta.</p>
+      <!--FIG:worked-->
+      <div class="tool wide" data-nosearch>
+        <div class="tool-h"><b>Decode it one segment at a time</b><span id="stepCount"></span></div>
+        <div class="step-panel">
+          <div class="step-label">Delta</div>
+          <div class="strip" id="stepDelta"></div>
+          <div class="explain" id="stepExplain"></div>
+          <div class="step-label">Source</div>
+          <div class="strip" id="stepSource"></div>
+          <div class="step-label">Output</div>
+          <div class="strip" id="stepOut"></div>
+        </div>
+        <div class="row">
+          <button class="btn" type="button" id="stepPrev">Back</button>
+          <button class="btn primary" type="button" id="stepNext">Next segment</button>
+          <button class="btn" type="button" id="stepReset">Start over</button>
+        </div>
+      </div>
+
+      <h3 id="s4-reject"><span class="sec">§4</span>When a decoder must refuse</h3>
+      <p>A decoder <span class="req">MUST</span> report failure for every condition below, beyond the zero-length delta of step 1. Whether it reports one code or one per condition is up to the implementation. Each <i>Try it</i> loads a delta that breaks that rule into the playground below.</p>
+      <div class="tbl-wrap wide"><table>
+        <thead><tr><th>#</th><th>Condition</th><th></th></tr></thead>
+        <tbody id="rejectRows"></tbody>
+      </table></div>
+      <p>Empty integers, leading zeros and values at or above 2<sup>32</sup> are not on this list. A decoder that accepts them still applies every structural and bounds check to the value it uses. A decoder <span class="req">MUST NOT</span> require or reject a particular segmentation, hash window, chain depth or copy strategy: those are encoder choices, not part of the format.</p>
+
+      <h3 id="s4-play"><span class="sec">∗</span>Playground</h3>
+      <p>Edit the source and target to see the delta Fossil's encoder would write and the decoder applying it. You can also edit the delta directly. Write a line feed as <code>\n</code> and any other byte as <code>\xNN</code>.</p>
+      <div class="tool wide" data-nosearch id="playground">
+        <div class="row">
+          <div class="field"><label for="pgSrc">Source</label><textarea id="pgSrc" rows="4" spellcheck="false"></textarea></div>
+          <div class="field"><label for="pgTgt">Target</label><textarea id="pgTgt" rows="4" spellcheck="false"></textarea></div>
+        </div>
+        <div class="field"><label for="pgDelta">Delta</label><textarea id="pgDelta" rows="3" spellcheck="false"></textarea></div>
+        <div class="row"><span id="pgStatus"></span><div class="stats" id="pgStats"></div></div>
+        <div class="strip" id="pgStrip"></div>
+        <div class="readout" id="pgOut"></div>
+        <div class="row">
+          <button class="btn" type="button" id="pgEncode">Encode target again</button>
+          <button class="btn" type="button" id="pgExample">Load the B.1 example</button>
+        </div>
+      </div>
+
+      <h3 id="s4-1"><span class="sec">§4.1</span>Asking only for the size</h3>
+      <p>A reader <span class="req">MAY</span> learn the target length by reading just the header integer and its 0x0a, without looking at anything after it. It <span class="req">MUST</span> fail on an empty buffer or a header not followed by 0x0a, and needs no further bytes to succeed. Fossil uses this to allocate the output before applying a delta.</p>
+
+      <h3 id="s4-2"><span class="sec">§4.2</span>When the source is missing</h3>
+      <p>The decoder works on bytes already in memory. It cannot ask for a missing source or wait for one, so the caller <span class="req">MUST</span> supply the whole source first and <span class="req">SHOULD</span> check it is available. When a repository receives a delta whose source it does not hold, it records the dependency and rebuilds the target later, once the source arrives from a peer through the Fossil Sync Protocol.</p>
+    </section>
+
+    <section class="prose" id="s5" data-sec="5">
+      <h2><span class="sec">§5</span>How Fossil's encoder finds copies</h2>
+      <p class="cite">Informative. The format allows any segmentation that rebuilds the target exactly.</p>
+      <p>Any sequence of copies and literals that reproduces the target is a valid delta. The draft leaves the search to the encoder. Fossil's own encoder, which the playground runs, works like this:</p>
+      <ol class="plain">
+        <li>Cut the source into 16-byte blocks and record each block's rolling hash in a table.</li>
+        <li>Slide a 16-byte window along the target one byte at a time, updating its hash cheaply, and look the hash up.</li>
+        <li>On a hit, compare the real bytes, then extend the match backward and forward as far as source and target agree.</li>
+        <li>Keep the longest match whose copy costs fewer bytes than writing it out. Emit the bytes skipped since the last copy as a literal, then the copy, and continue after it.</li>
+      </ol>
+      <!--FIG:encoder-->
+      <p>A copy is kept only when its length is at least the digits of the pending literal's length, the copy's count and its offset, plus three opcode bytes. Fossil follows at most 250 entries of a hash chain. When the source is 16 bytes or shorter no copy can win, and an encoder <span class="req">MAY</span> write the whole target as one literal. None of these numbers is visible in the delta.</p>
+    </section>
+
+    <section class="prose" id="s6" data-sec="6">
+      <h2><span class="sec">§6</span>Security considerations</h2>
+      <ul class="plain">
+        <li>The checksum is a 32-bit sum. It catches accidental corruption but anyone can forge it. Integrity comes from the artifact's name, a cryptographic hash checked by the layer that stores it.</li>
+        <li>A parser <span class="req">MUST NOT</span> read past the end of the delta, and integer reading <span class="req">MUST</span> stop at the buffer's end. A zero-length delta is rejected before any read.</li>
+        <li>A failed application <span class="req">MUST NOT</span> be reported as success. Callers <span class="req">MUST</span> check the result and discard the output on failure.</li>
+        <li>Decoders <span class="req">SHOULD</span> bound every segment by the declared target length rather than waiting for the trailer. The declared length is itself untrusted: constrained systems <span class="req">SHOULD</span> check it against their own limits before allocating.</li>
+        <li>Bytes 0x80–0xFF <span class="req">MUST</span> end an integer. A decoder that masks the high bit before looking up a digit accepts 64 extra digit bytes and parses crafted input differently from everyone else.</li>
+      </ul>
+    </section>
+
+    <section class="prose" id="sA" data-sec="A">
+      <h2><span class="sec">App. A</span>Three corrections to older documentation</h2>
+      <div class="tbl-wrap wide"><table>
+        <thead><tr><th>Older text says</th><th>The format actually</th></tr></thead>
+        <tbody>
+          <tr><td>Integers are written “LSB first”.</td><td>Writes the most significant digit first. The old phrase describes the order digits are collected before the encoder reverses them.</td></tr>
+          <tr><td>The checksum is taken “modulo 2<sup>32</sup>−1”.</td><td>Is an unsigned 32-bit sum that wraps naturally, which is modulo 2<sup>32</sup>.</td></tr>
+          <tr><td>A copy count of zero means “copy the rest of the input”.</td><td>Copies zero bytes, and conforming encoders never write one.</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section class="prose" id="sB" data-sec="B">
+      <h2><span class="sec">App. B</span>Two small cases</h2>
+      <h3 id="sB-4"><span class="sec">B.4</span>An empty target</h3>
+      <p>The delta <code>0\n0;</code> rebuilds zero bytes from any source: a header of zero, no segments, and the checksum of nothing, which is zero. Four bytes, <code>30 0a 30 3b</code>.</p>
+      <h3 id="sB-2"><span class="sec">B.2</span>Values from the worked example</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Value</th><th>Encoding</th><th>Digits</th></tr></thead>
+        <tbody>
+          <tr><td class="num">0</td><td class="num">0</td><td>0</td></tr>
+          <tr><td class="num">12</td><td class="num">C</td><td>C = 12</td></tr>
+          <tr><td class="num">35</td><td class="num">Z</td><td>Z = 35</td></tr>
+          <tr><td class="num">43</td><td class="num">g</td><td>g = 43</td></tr>
+          <tr><td class="num">45</td><td class="num">i</td><td>i = 45</td></tr>
+          <tr><td class="num">59</td><td class="num">w</td><td>w = 59</td></tr>
+          <tr><td class="num">151</td><td class="num">2N</td><td>2 × 64 + 23</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section class="prose" id="sC" data-sec="C">
+      <h2><span class="sec">App. C</span>Collected grammar</h2>
+      <p>ABNF per RFC 5234. Payloads are located by count, which ABNF cannot express, so the count governs. Where the grammar and the prose differ on what a decoder tolerates, the prose wins.</p>
+      <pre class="code wide" data-abnf>delta     = header *segment trailer
+header    = integer LF
+segment   = copy / literal
+copy      = integer "@" integer ","
+literal   = integer ":" payload
+            ; &lt;integer&gt; opaque bytes; MAY contain LF;
+            ; located by count, not by scanning
+trailer   = integer ";"
+integer   = 1*DIGIT64
+DIGIT64   = %x30-39 / %x41-5A / "_" / %x61-7A / "~"
+            ; value 0-9, A-Z=10-35, _=36, a-z=37-62, ~=63
+payload   = *OCTET      ; exactly &lt;count&gt; octets
+LF        = %x0A</pre>
+    </section>
+
+    <footer class="end">
+      <p>A reading of <i>The Fossil Delta Format</i>, draft-fossil-delta-format-00 (Hipp, Beal and Shearer, July 2026). Section numbers refer to the draft, which remains the normative text.</p>
+      <p>The playground runs a JavaScript port of Fossil's <code>delta_create</code>. Its output matched <code>fossil test-delta-create</code> (fossil 2.28) byte for byte on 200 random text and binary pairs. The diagrams are Pikchr, drawn in your browser by Pikchr Studio's WebAssembly build. <span id="pkMode"></span></p>
+    </footer>
+  </main>
+<!--ILLUS:af-->
+<!--ILLUS:rs-->
+<!--ILLUS:sp-->
+  <main class="doc rfc" id="draft" hidden>
+    <header class="rfc-top">
+      <div class="history-bar" data-nosearch>
+        <div class="hb-row">
+          <span class="hb-label">Version</span>
+          <span class="seg" id="versionSeg"><button type="button" aria-pressed="true" disabled>29 Jul 2026 · tip</button></span>
+          <span class="hb-label">Show</span>
+          <span class="seg" id="modeSeg"><button type="button" data-mode="text" aria-pressed="true" disabled>Text</button><button type="button" data-mode="changes" aria-pressed="false" disabled>Changes</button><button type="button" data-mode="history" aria-pressed="false" disabled>History</button><button type="button" data-mode="edit" aria-pressed="false" hidden>Edit</button></span>
+        </div>
+        <p class="hb-status" id="draftStatus">Read from the repository once Fossil loads.</p>
+        <div class="commit-bar" id="commitBar" hidden>
+          <span class="cb-count" id="pendingCount"></span>
+          <div class="field cb-msg"><label for="commitMsg">Check-in comment</label><input id="commitMsg" placeholder="What changed and why"></div>
+          <div class="field cb-user"><label for="commitUser">Fossil user</label><input id="commitUser" placeholder="your fossil login" autocomplete="username"></div>
+          <div class="cb-actions"><button class="btn primary" type="button" id="commitBtn">Commit and publish</button><button class="btn" type="button" id="discardBtn">Discard edits</button></div>
+          <p class="cb-note" id="commitNote"></p>
+        </div>
+      </div>
+      <div class="ietf-head" id="draftHead"></div>
+      <p class="lede">The draft's text, unchanged. Headings marked <span class="to-other" style="margin:0;vertical-align:0">Illustrated</span> open the explained version of that section.</p>
+    </header>
+    <div id="draftBody"></div>
+  </main>
+  <main class="doc" id="repo" hidden>
+    <header class="hero">
+      <div class="eyebrow" id="repoEyebrow">delta-format.fossil · running in your browser</div>
+      <h1>The draft, as a Fossil repository</h1>
+      <p class="lede">The Draft text view reads its text from a real Fossil repository shipped alongside this page and opened here with go-libfossil, compiled to WebAssembly. Nothing is cloned or fetched from a server.</p>
+      <div class="repo-card" data-nosearch>
+        <div class="repo-facts" id="repoFacts"><span class="status" id="repoState">Loading Fossil (5.9 MB)</span></div>
+        <div class="row">
+          <button class="btn primary" type="button" id="downloadRepo">Download delta-format.fossil</button>
+          <span class="dl-note" id="downloadNote">Saved as a .zip holding the repository. Unzip it and run <code>fossil ui</code> on the file inside.</span>
+        </div>
+      </div>
+    </header>
+    <section class="prose" id="r-timeline">
+      <h2>Timeline</h2>
+      <p>Every check-in that touched the draft, newest first. Each is a manifest: a small text artifact whose cards name the files, the parent and the author, and whose hash is the check-in's name. Choose one to read its manifest.</p>
+      <div class="tool wide" data-nosearch>
+        <ol class="tl" id="timeline"><li class="tl-empty">Loading…</li></ol>
+        <div class="manifest" id="manifest"></div>
+      </div>
+    </section>
+    <section class="prose" id="r-changes">
+      <h2>What changed between the drafts</h2>
+      <p>Fossil's own diff between the two check-ins. In the draft view, "Mark what this version changed" uses the same history line by line.</p>
+      <div class="tool wide" data-nosearch>
+        <div class="stats" id="diffStats"></div>
+        <div class="diff" id="diff"></div>
+      </div>
+    </section>
+    <section class="prose topic" id="r-sync" data-topic="sp" hidden>
+      <h2>Watch a sync</h2>
+      <p>A real pull or push, run in your browser between two throwaway copies of this repository. One copy plays the server and one, cloned from it, plays your client. For a pull, the server gets a new check-in first; for a push, the client does. Every message below is the one go-libfossil actually sent, and each round of the conversation is drawn as it happens.</p>
+      <div class="tool wide sync-tool" data-nosearch>
+        <div class="tool-h"><b>Client and server, round by round</b><span id="syncWhat">Opens when the repository is ready</span></div>
+        <div class="row sync-controls">
+          <span class="seg" id="syncKind"><button type="button" data-kind="pull" aria-pressed="true">Pull</button><button type="button" data-kind="push" aria-pressed="false">Push</button></span>
+          <button class="btn primary" type="button" id="syncPlay" disabled>Play</button>
+          <button class="btn" type="button" id="syncStep" disabled>Step</button>
+          <button class="btn" type="button" id="syncReset" disabled>Start over</button>
+          <span class="sync-progress" id="syncProgress"></span>
+        </div>
+        <div class="sync-stage" id="syncStage" role="img" aria-label="Client and server repositories with the sync messages between them"></div>
+        <div class="legend sync-legend"><span><i class="lg-solid"></i>held</span><span><i class="lg-dashed"></i>not held yet</span><span><i class="lg-new"></i>just arrived</span></div>
+        <div class="sync-msg" id="syncMsg"></div>
+      </div>
+    </section>
+    <section class="prose topic" id="r-names" data-topic="af" hidden>
+      <h2>Every artifact, named by its hash</h2>
+      <p>An artifact's name is the hash of its exact bytes: SHA3-256 for a 64-digit name, SHA1 for 40. Here the page reads every artifact this repository stores, hashes it again, and compares. For each check-in manifest it also lists the cards it carries and recomputes its Z card, the MD5 of every byte above that card.</p>
+      <div class="tool wide" data-nosearch>
+        <div class="tool-h"><b>Re-hash every stored artifact</b><span id="namesWhat">Opens when the repository is ready</span></div>
+        <div class="row"><button class="btn primary" type="button" id="namesRun" disabled>Check every name</button><span class="stats" id="namesStats"></span></div>
+        <div class="tbl-wrap"><table class="names-table"><thead><tr><th>Artifact</th><th>What it is</th><th>Bytes</th><th>Hash of the bytes</th><th>Cards</th><th>Z card</th></tr></thead><tbody id="namesRows"><tr><td colspan="6">Press the button to hash every artifact.</td></tr></tbody></table></div>
+      </div>
+    </section>
+    <section class="prose topic" id="r-rebuild" data-topic="rs" hidden>
+      <h2>State is derived: erase it and rebuild it</h2>
+      <p>The Repository State draft treats tables such as <code>event</code>, <code>plink</code>, <code>mlink</code>, <code>tagxref</code>, <code>filename</code> and <code>leaf</code> as derived: anything in them can be recomputed from the artifacts alone. Here the page copies this repository, empties those tables, rebuilds them from the stored artifacts with go-libfossil, and compares every row with what Fossil originally wrote.</p>
+      <div class="tool wide" data-nosearch>
+        <div class="tool-h"><b>Erase and rebuild the derived tables</b><span id="rebuildWhat">Opens when the repository is ready</span></div>
+        <div class="row"><button class="btn primary" type="button" id="rebuildRun" disabled>Erase and rebuild</button><span class="stats" id="rebuildStats"></span></div>
+        <div class="tbl-wrap"><table class="rebuild-table"><thead><tr><th>Table</th><th>Rows</th><th>Erased</th><th>Rebuilt</th><th>Compared with Fossil's</th></tr></thead><tbody id="rebuildRows"><tr><td colspan="5">Press the button to run it on a throwaway copy.</td></tr></tbody></table></div>
+        <p class="rebuild-note" id="rebuildNote"></p>
+      </div>
+    </section>
+    <section class="prose topic" id="r-storage" data-topic="dl">
+      <h2>How the repository stores the draft</h2>
+      <p>Every artifact is stored zlib-compressed. Fossil also keeps older file versions as deltas against newer ones, so the newest text reads fastest. Older drafts here are not stored in full: each is a delta against a newer one, in exactly the format the Delta Format RFC specifies. Decode one below with that reading's own decoder.</p>
+      <div class="tool wide" data-nosearch>
+        <div class="tbl-wrap"><table><thead><tr><th>Artifact</th><th>What it is</th><th>Size</th><th>Stored</th><th>Stored as</th></tr></thead><tbody id="storage"><tr><td colspan="5">Loading…</td></tr></tbody></table></div>
+        <div class="row"><button class="btn primary" type="button" id="decodeStored" disabled>Decode the stored delta</button><span id="decodeNote"></span></div>
+        <div class="stats" id="decodeStats"></div>
+        <div class="strip" id="decodeStrip"></div>
+        <div class="row" id="decodeMore" hidden><button class="btn" type="button" id="decodeAll">Show all bytes</button></div>
+      </div>
+    </section>
+    <footer class="end">
+      <p id="repoFooter">Each repository holds every distinct version of its draft from zit's own history, with the original check-in dates, authors and comments, then the 29 July 2026 revision. Check-ins made by this page's editors are added on top. go-libfossil opens it with SQLite's in-memory file system, so the page needs no server, Worker or storage permission.</p>
+    </footer>
+  </main>
+</div>
+
+<script type="application/json" id="figData">/*FIGDATA*/</script>
+<script type="application/json" id="fallbackData">/*FALLBACK*/</script>
+<script type="application/json" id="codeTermsData">/*CODETERMS*/</script>
+<script>
+/*TOOLSJS*/
+</script>
+<script src="pikchr.js"></script>
+<script>
+/*DELTAJS*/
+</script>
+<script>
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const enc = new TextEncoder(), dec = new TextDecoder("utf-8", { fatal: false });
+  // Where the page is served. A claude.ai artifact can host only web types,
+  // so there the binaries ship as base64 text; a Worker serves them as they are.
+  const HOST = /*HOST*/"artifact";
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+
+  const SRC = enc.encode("The quick brown fox jumps over the lazy dog. A Fossil delta encodes byte-level differences compactly.\n");
+  const TGT = enc.encode("The quick brown fox jumps over the sleeping fox. A Fossil delta encodes byte-level differences compactly.\n An example delta target with appended tail.\n");
+  const EXAMPLE = Delta.create(SRC, TGT).bytes;
+
+  const glyph = (b) => b === 10 ? "↵" : b === 32 ? "·" : b < 32 || b === 127 ? "␀" : b > 127 ? "·" : String.fromCharCode(b);
+  const isCtl = (b) => b < 33 || b > 126;
+  const hex2 = (n) => n.toString(16).padStart(2, "0");
+
+  // Classify every delta byte by the part it belongs to.
+  function roles(delta, res) {
+    const r = new Array(delta.length).fill("");
+    for (const s of res.steps) {
+      for (let i = s.from; i < s.to; i++) r[i] = s.type === "header" || s.type === "trailer" ? "frame" : s.type === "copy" ? "copy" : "lit";
+      if (s.type === "literal") { const colon = delta.indexOf(0x3a, s.from); for (let i = s.from; i <= colon; i++) r[i] = "litop"; }
+    }
+    return r;
+  }
+  function stepOf(res, i) { return res.steps.findIndex((s) => i >= s.from && i < s.to); }
+
+  function describe(s, delta) {
+    const txt = (a, b) => dec.decode(delta.subarray(a, b)).replace(/\n/g, "↵");
+    if (s.type === "header") return `Header <code>${txt(s.from, s.to - 1)}</code> + LF: the target is <b>${s.value}</b> bytes.`;
+    if (s.type === "copy") return `Copy <code>${txt(s.from, s.to)}</code>: take <b>${s.count}</b> bytes of the source from offset <b>${s.offset}</b>.`;
+    if (s.type === "literal") return `Literal <code>${txt(s.from, delta.indexOf(0x3a, s.from) + 1)}</code>: the next <b>${s.count}</b> bytes of the delta go to the output as they are.`;
+    return `Trailer <code>${txt(s.from, s.to)}</code>: checksum ${s.value} (0x${s.value.toString(16).toUpperCase()}). The output sums to the same value, so the delta is accepted.`;
+  }
+
+  function renderStrip(host, bytes, cls) {
+    host.textContent = "";
+    const frag = document.createDocumentFragment();
+    bytes.forEach((b, i) => { const s = el("span", "b" + (cls ? " " + cls(i) : "") + (isCtl(b) ? " ctl" : ""), glyph(b)); s.title = `byte ${i} · 0x${hex2(b)}`; frag.append(s); });
+    host.append(frag);
+    return [...host.children];
+  }
+
+  // Hero: the example delta, segment by segment.
+  (() => {
+    const res = Delta.apply(SRC, EXAMPLE), r = roles(EXAMPLE, res);
+    const cells = renderStrip($("#heroStrip"), [...EXAMPLE], (i) => r[i]);
+    const note = $("#heroNote"), base = note.innerHTML;
+    const show = (i) => {
+      const k = stepOf(res, i); if (k < 0) return;
+      const s = res.steps[k];
+      cells.forEach((c, j) => c.classList.toggle("dim", j < s.from || j >= s.to));
+      note.innerHTML = describe(s, EXAMPLE);
+    };
+    const clear = () => { cells.forEach((c) => c.classList.remove("dim")); note.innerHTML = base; };
+    cells.forEach((c, i) => { c.addEventListener("mouseenter", () => show(i)); c.addEventListener("click", () => show(i)); });
+    $("#heroStrip").addEventListener("mouseleave", clear);
+  })();
+
+  // Alphabet.
+  (() => {
+    const host = $("#alpha");
+    for (let i = 0; i < 64; i++) { const d = el("div"); d.append(el("b", null, Delta.DIGITS[i]), el("span", null, String(i))); host.append(d); }
+  })();
+
+  // Integer converter.
+  (() => {
+    const dIn = $("#intDec"), bIn = $("#intB64"), out = $("#intDigits"), note = $("#intNote");
+    const show = (b64) => {
+      out.textContent = ""; note.textContent = "";
+      const r = Delta.decodeInt(b64);
+      r.digits.forEach((d, i) => {
+        const box = el("div", "digit");
+        box.append(el("b", null, d.ch), el("span", null, `${d.d} → ${i ? "× 64 + " : ""}${d.v}`));
+        out.append(box);
+      });
+      if (r.error) { note.textContent = r.error + "."; return null; }
+      if (r.value >= 2n ** 32n) note.textContent = "At or above 2³², producers never write this value.";
+      else if (b64.length > 1 && b64[0] === "0") note.textContent = "Leading zero: not canonical. A decoder may reject it.";
+      return r.value;
+    };
+    dIn.addEventListener("input", () => {
+      const t = dIn.value.trim();
+      if (!/^\d+$/.test(t)) { out.textContent = ""; note.textContent = "Enter digits 0–9."; return; }
+      let v = BigInt(t), s = "";
+      if (v === 0n) s = "0"; else while (v > 0n) { s = Delta.DIGITS[Number(v % 64n)] + s; v /= 64n; }
+      bIn.value = s; show(s);
+    });
+    bIn.addEventListener("input", () => { const v = show(bIn.value.trim()); if (v != null) dIn.value = String(v); });
+    show(bIn.value);
+  })();
+
+  // Checksum calculator.
+  (() => {
+    const inp = $("#sumIn"), out = $("#sumOut");
+    inp.value = dec.decode(TGT);
+    const run = () => {
+      const b = enc.encode(inp.value), s = Delta.checksum(b);
+      out.innerHTML = `<span><b>${b.length}</b> bytes</span><span><b>${Math.floor(b.length / 4)}</b> whole words, <b>${b.length % 4}</b>-byte tail</span><span>sum <b class="mono">0x${s.toString(16).toUpperCase().padStart(8, "0")}</b></span><span>trailer <b class="mono">${Delta.putInt(s)};</b></span>`;
+    };
+    inp.addEventListener("input", run); run();
+  })();
+
+  // Step-through of the worked example.
+  (() => {
+    const res = Delta.apply(SRC, EXAMPLE), r = roles(EXAMPLE, res), steps = res.steps;
+    const dCells = renderStrip($("#stepDelta"), [...EXAMPLE], (i) => r[i]);
+    const sCells = renderStrip($("#stepSource"), [...SRC]);
+    const oHost = $("#stepOut");
+    const prov = new Array(TGT.length).fill("");
+    for (const s of steps) if (s.type === "copy" || s.type === "literal") for (let i = 0; i < s.count; i++) prov[s.outAt + i] = s.type === "copy" ? "copy" : "lit";
+    const oCells = renderStrip(oHost, [...TGT], (i) => prov[i]);
+    let k = 0;
+    const draw = () => {
+      const s = steps[k];
+      dCells.forEach((c, j) => { c.classList.toggle("dim", j >= s.to); c.classList.toggle("on", j >= s.from && j < s.to); });
+      const upto = s.type === "header" ? 0 : s.type === "trailer" ? TGT.length : s.outAt + s.count;
+      oCells.forEach((c, j) => { c.hidden = j >= upto; c.classList.toggle("on", (s.type === "copy" || s.type === "literal") && j >= s.outAt && j < upto); });
+      sCells.forEach((c, j) => c.classList.toggle("src-hit", s.type === "copy" && j >= s.offset && j < s.offset + s.count));
+      $("#stepExplain").innerHTML = describe(s, EXAMPLE) + (s.type === "copy" || s.type === "literal" ? ` Output position: ${s.outAt} → ${upto}.` : "");
+      $("#stepCount").textContent = `step ${k + 1} of ${steps.length}`;
+      $("#stepPrev").disabled = k === 0; $("#stepNext").disabled = k === steps.length - 1;
+    };
+    $("#stepNext").addEventListener("click", () => { if (k < steps.length - 1) { k++; draw(); } });
+    $("#stepPrev").addEventListener("click", () => { if (k > 0) { k--; draw(); } });
+    $("#stepReset").addEventListener("click", () => { k = 0; draw(); });
+    draw();
+  })();
+
+  // Playground.
+  const escapeBytes = (b) => { let s = ""; for (const x of b) s += x === 10 ? "\\n" : x === 92 ? "\\\\" : x >= 32 && x < 127 ? String.fromCharCode(x) : "\\x" + hex2(x); return s; };
+  const unescapeBytes = (s) => {
+    const out = [];
+    for (let i = 0; i < s.length; i++) {
+      const c = s[i];
+      if (c === "\\" && s[i + 1] === "n") { out.push(10); i++; }
+      else if (c === "\\" && s[i + 1] === "\\") { out.push(92); i++; }
+      else if (c === "\\" && s[i + 1] === "x" && /^[0-9a-fA-F]{2}$/.test(s.slice(i + 2, i + 4))) { out.push(parseInt(s.slice(i + 2, i + 4), 16)); i += 3; }
+      else if (c === "\n") { /* layout only */ }
+      else out.push(...enc.encode(c));
+    }
+    return Uint8Array.from(out);
+  };
+  const pg = { src: $("#pgSrc"), tgt: $("#pgTgt"), delta: $("#pgDelta"), status: $("#pgStatus"), stats: $("#pgStats"), strip: $("#pgStrip"), out: $("#pgOut") };
+  function pgDecode() {
+    const src = enc.encode(pg.src.value), delta = unescapeBytes(pg.delta.value);
+    const res = Delta.apply(src, delta), r = roles(delta, res);
+    const cells = renderStrip(pg.strip, [...delta], (i) => r[i]);
+    if (res.ok) {
+      pg.status.innerHTML = `<span class="status ok">Applies cleanly</span>`;
+      const tgt = enc.encode(pg.tgt.value), same = tgt.length === res.out.length && tgt.every((b, i) => b === res.out[i]);
+      const nCopy = res.steps.filter((s) => s.type === "copy").reduce((n, s) => n + s.count, 0);
+      pg.stats.innerHTML = `<span>source <b>${src.length}</b> B</span><span>delta <b>${delta.length}</b> B</span><span>target <b>${res.out.length}</b> B</span><span><b>${nCopy}</b> B copied</span><span>${same ? "matches the target box" : "differs from the target box"}</span>`;
+      pg.out.textContent = dec.decode(res.out);
+    } else {
+      const label = res.cond === 0 ? "zero-length delta" : `condition ${res.cond}`;
+      pg.status.innerHTML = `<span class="status bad">Rejected · ${label}</span>`;
+      pg.stats.innerHTML = `<span>${res.msg}</span>`;
+      pg.out.textContent = "No output. A failed application must not be reported as success, and the partial buffer is discarded.";
+      if (cells[res.at]) cells[res.at].classList.add("on");
+    }
+  }
+  function pgEncode() { pg.delta.value = escapeBytes(Delta.create(enc.encode(pg.src.value), enc.encode(pg.tgt.value)).bytes); pgDecode(); }
+  function pgExample() { pg.src.value = dec.decode(SRC); pg.tgt.value = dec.decode(TGT); pgEncode(); }
+  pg.src.addEventListener("input", pgEncode);
+  pg.tgt.addEventListener("input", pgEncode);
+  pg.delta.addEventListener("input", pgDecode);
+  $("#pgEncode").addEventListener("click", pgEncode);
+  $("#pgExample").addEventListener("click", pgExample);
+  pgExample();
+
+  // Rejection table with runnable counterexamples.
+  const REJECT = [
+    [0, "The delta is zero bytes long.", ""],
+    [1, "The header integer is not followed by 0x0a.", "2N;"],
+    [2, "Reading an integer runs off the end of the delta.", "2N"],
+    [3, "A copy has no comma after its offset.", "2N\\nZ@0;"],
+    [4, "A copy would push the output past the target length.", "5\\nZ@0,0;"],
+    [5, "A copy's offset plus count runs past the end of the source.", "w\\nw@h,0;"],
+    [6, "A literal would push the output past the target length.", "2\\n3:abc0;"],
+    [7, "A literal's count is larger than the bytes left in the delta.", "9\\n9:abc"],
+    [8, "The checksum does not match (decoders that verify).", "3\\n3:abc0;"],
+    [9, "At the trailer, the output is not the declared length.", "5\\n3:abc0;"],
+    [10, "A byte where an opcode belongs is not @, : or ;.", "3\\n3!abc"],
+    [11, "The delta ends without a ; trailer.", "3\\n3:abc"],
+  ];
+  const tb = $("#rejectRows");
+  for (const [n, text, bad] of REJECT) {
+    const tr = el("tr"), b = el("button", "reject-try", "Try it");
+    b.type = "button";
+    b.addEventListener("click", () => {
+      if (pg.src.value !== dec.decode(SRC)) pgExample();
+      pg.delta.value = bad; pgDecode();
+      $("#playground").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+    });
+    const act = el("td"); act.append(b);
+    tr.append(el("td", "num", n === 0 ? "—" : String(n)), el("td", null, text), act);
+    tb.append(tr);
+  }
+
+  // Pikchr figures: pre-rendered first, then redrawn live by the WebAssembly build.
+  const figs = JSON.parse($("#figData").textContent);
+  const theme = (svg) => svg.replace(/rgb\(0,0,0\)/g, "currentColor").replace(/rgb\(12,0,3\)/g, "var(--lit-tint)");
+  const width = (svg) => { const m = svg.match(/viewBox="0 0 ([\d.]+)/); return m ? Math.round(parseFloat(m[1])) + "px" : "100%"; };
+  const views = {};
+  for (const fig of $$("figure.pk")) {
+    const f = figs[fig.dataset.fig], view = $(".pk-view", fig);
+    view.innerHTML = theme(f.svg); view.style.setProperty("--pk-w", width(f.svg));
+    views[fig.dataset.fig] = view;
+    const [bD, bS] = $$(".seg button", fig);
+    bD.addEventListener("click", () => { fig.classList.remove("show-src"); bD.setAttribute("aria-pressed", "true"); bS.setAttribute("aria-pressed", "false"); });
+    bS.addEventListener("click", () => { fig.classList.add("show-src"); bS.setAttribute("aria-pressed", "true"); bD.setAttribute("aria-pressed", "false"); });
+    const copy = $(".pk-copy", fig);
+    copy.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(f.src); copy.textContent = "Copied"; setTimeout(() => (copy.textContent = "Copy source"), 1600); }
+      catch { bS.click(); getSelection().selectAllChildren($(".pk-src", fig)); }
+    });
+  }
+  const mode = $("#pkMode");
+  // Other parts of the page (the sync stage) draw with the same renderer.
+  let resolvePikchr, rejectPikchr;
+  const pikchrReady = new Promise((ok, no) => { resolvePikchr = ok; rejectPikchr = no; });
+  pikchrReady.catch(() => {});
+  if (typeof initPikchrModule === "function") {
+    initPikchrModule().then((m) => {
+      const render = m.cwrap("pikchr", "number", ["string", "string", "number", "number", "number"]);
+      resolvePikchr((src) => { const p = render(src, "pikchr", 1, 0, 0); const svg = m.UTF8ToString(p); m._free(p); return svg; });
+      for (const [name, view] of Object.entries(views)) {
+        const p = render(figs[name].src, "pikchr", 1, 0, 0);
+        const svg = m.UTF8ToString(p); m._free(p);
+        if (svg.trimStart().startsWith("<svg")) { view.innerHTML = theme(svg); view.dataset.live = "1"; }
+      }
+      mode.textContent = "This visit, the figures were rendered live.";
+    }).catch(() => { rejectPikchr(); mode.textContent = "This visit, the WebAssembly build did not load, so the figures shown were pre-rendered from the same sources."; });
+  } else mode.textContent = "This visit, the figures shown were pre-rendered from the same sources.";
+
+  // Syntax diagrams for every ABNF block, laid out by railroad.js and drawn by
+  // the same Pikchr build: one small diagram per rule, flowing side by side.
+  let railMeasure = null;
+  async function studioLink(src) {
+    try {
+      const z = new Blob([src]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+      const b = new Uint8Array(await new Response(z).arrayBuffer());
+      let bin = ""; for (const c of b) bin += String.fromCharCode(c);
+      return "https://pikchr-studio.daniel-mestas.workers.dev/#z=" + btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    } catch { return "https://pikchr-studio.daniel-mestas.workers.dev/"; }
+  }
+  function railFigure(g, render) {
+    const fig = el("figure", "pk syntax wide");
+    fig.dataset.nosearch = "";
+    const view = el("div", "syntax-view");
+    let tall = 0;
+    view.setAttribute("role", "img");
+    view.setAttribute("aria-label", "Syntax diagrams for " + g.rules.map((r) => r.name).join(", "));
+    for (const r of g.rules) {
+      const svg = render(r.src);
+      if (!svg.trimStart().startsWith("<svg")) continue;
+      const cell = el("div", "syntax-rule");
+      cell.innerHTML = theme(svg);
+      cell.style.setProperty("--pk-w", width(svg));
+      view.append(cell);
+      const vb = svg.match(/viewBox="0 0 [\d.]+ ([\d.]+)/);
+      tall += vb ? parseFloat(vb[1]) : 0;
+    }
+    const src = el("pre", "pk-src", g.src);
+    const bar = el("figcaption", "pk-bar");
+    const n = g.rules.length;
+    bar.append(el("span", "cap", n === 1 ? "Syntax diagram of the rule above" : `Syntax diagrams of the ${n} rules above`));
+    const seg = el("span", "seg"), bD = el("button", null, "Diagram"), bS = el("button", null, "Source");
+    for (const b of [bD, bS]) { b.type = "button"; seg.append(b); }
+    bD.setAttribute("aria-pressed", "true"); bS.setAttribute("aria-pressed", "false");
+    bD.addEventListener("click", () => { fig.classList.remove("show-src"); bD.setAttribute("aria-pressed", "true"); bS.setAttribute("aria-pressed", "false"); });
+    bS.addEventListener("click", () => { fig.classList.add("show-src"); bS.setAttribute("aria-pressed", "true"); bD.setAttribute("aria-pressed", "false"); });
+    const copy = el("button", "act pk-copy", "Copy source");
+    copy.type = "button";
+    copy.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(g.src); copy.textContent = "Copied"; setTimeout(() => (copy.textContent = "Copy source"), 1600); }
+      catch { bS.click(); getSelection().selectAllChildren(src); }
+    });
+    const edit = el("a", "act", "Edit in pikchr-studio");
+    edit.target = "_blank"; edit.rel = "noopener"; edit.href = "https://pikchr-studio.daniel-mestas.workers.dev/";
+    studioLink(g.src).then((u) => (edit.href = u));
+    bar.append(seg, copy, edit);
+    // Collapsible; a set of diagrams taller than a screen starts collapsed.
+    const fold = el("details", "syntax-fold"), sum = el("summary");
+    const names = g.rules.map((r) => r.name);
+    sum.append(el("span", "sf-title", n === 1 ? "Syntax diagram" : `Syntax diagrams · ${n} rules`),
+      el("span", "sf-names", names.length > 4 ? names.slice(0, 4).join(", ") + ", …" : names.join(", ")));
+    fold.open = tall <= 640;
+    fold.append(sum, view, src, bar);
+    fig.append(fold);
+    return fig;
+  }
+  async function addRails(root, sel) {
+    let render;
+    try { render = await pikchrReady; } catch { return; }
+    railMeasure ||= pikchrMeasure(render);
+    for (const pre of $$(sel, root)) {
+      if (pre.nextElementSibling && pre.nextElementSibling.matches("figure.syntax")) continue;
+      const g = railroad(pre.textContent, railMeasure);
+      if (g) pre.after(railFigure(g, render));
+    }
+  }
+  addRails(document, "pre[data-abnf]");
+
+  // Two panes share one page: the illustrated reading and the draft's own text.
+  // Four RFCs share one page. Each has an illustrated pane; the Draft text and
+  // Repository views always show the RFC chosen in the rail.
+  const RFCS = {
+    dl: { name: "delta-format", title: "The Fossil Delta Format" },
+    af: { name: "artifact-format", title: "Artifact Format" },
+    rs: { name: "repo-state", title: "Repository State and Check-in Resolution" },
+    sp: { name: "sync-protocol", title: "Sync Protocol" },
+  };
+  let curKey = "dl";
+  const CODE_TERMS = JSON.parse(document.getElementById("codeTermsData").textContent);
+  const fileOf = (k) => `draft-fossil-${RFCS[k].name}-00.txt`;
+  const repoFileOf = (k) => (HOST === "worker" ? `repos/${RFCS[k].name}.fossil` : `${RFCS[k].name}-fossil.txt`);
+  const fossilNameOf = (k) => `${RFCS[k].name}.fossil`;
+  const panes = { get doc() { return $("#illus-" + curKey); }, draft: $("#draft"), repo: $("#repo") };
+  const rfcOf = (node) => (node && node.closest("[data-rfc]") ? node.closest("[data-rfc]").dataset.rfc : null);
+  const viewOf = (node) => (node && node.closest("#draft") ? "draft" : node && node.closest("#repo") ? "repo" : "doc");
+  const TO_RFC = { s1: "s1", s3: "s3", "s3-1": "s3-1", "s3-2": "s3-2", "s3-3": "s3-3", "s3-4": "s3-4", s4: "s4", "s4-walk": "sB-1", "s4-reject": "s4", "s4-1": "s4-1", "s4-2": "s4-2", s5: "s5", s6: "s6", sA: "sA", sB: "sB", "sB-4": "sB-4", "sB-2": "sB-2", sC: "sC" };
+  const TO_ILL = { s1: "s1", s2: "s1", s3: "s3", "s3-1": "s3-1", "s3-2": "s3-2", "s3-3": "s3-3", "s3-3-1": "s3-3", "s3-3-2": "s3-3", "s3-4": "s3-4", s4: "s4", "s4-1": "s4-1", "s4-2": "s4-2", s5: "s5", s6: "s6", sA: "sA", sB: "sB", "sB-1": "s4-walk", "sB-2": "sB-2", "sB-3": "s3-4", "sB-4": "sB-4", sC: "sC" };
+  for (const h of $$("main.illus h2, main.illus h3")) {
+    const key = rfcOf(h), id = h.id || (h.closest("section") || {}).id;
+    const to = h.dataset.draft || (key === "dl" ? TO_RFC[id] : null);
+    if (!to) continue;
+    const a = el("a", "to-other", "Draft text");
+    a.href = "#d-" + to; a.title = "Read this section verbatim in the draft";
+    h.append(a);
+  }
+  // Draft headings link back to the illustrated section that explains them.
+  const illusFor = {};
+  for (const k of Object.keys(RFCS)) illusFor[k] = k === "dl" ? { ...TO_ILL } : {};
+  for (const h of $$("main.illus [data-draft]")) {
+    const k = rfcOf(h), target = h.id || (h.closest("section") || {}).id;
+    if (k && target && !(h.dataset.draft in illusFor[k])) illusFor[k][h.dataset.draft] = target;
+  }
+  function addIllustratedChips() {
+    for (const h of $$("#draft .rfc-h")) {
+      const to = illusFor[curKey][h.id.slice(2)];
+      if (!to || $(".to-other", h)) continue;
+      const a = el("a", "to-other", "Illustrated");
+      a.href = "#" + to; a.title = "Open the explained version of this section";
+      h.append(a);
+    }
+  }
+  addIllustratedChips();
+
+  const toc = $("#toc"), rail = $("#rail"), scrim = $("#scrim"), opener = $("#openRail");
+  const q = $("#q"), results = $("#results"), meta = $("#searchMeta"), countEl = $("#hitCount");
+  const motion = () => (matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth");
+  const narrow = () => matchMedia("(max-width: 900px)").matches;
+  const setRail = (open) => { rail.classList.toggle("open", open); scrim.hidden = !open; opener.setAttribute("aria-expanded", String(open)); };
+  opener.addEventListener("click", () => { setRail(true); q.focus(); });
+  scrim.addEventListener("click", () => setRail(false));
+  rail.addEventListener("click", (e) => { if (e.target.closest("a") && narrow()) setRail(false); });
+
+  const plain = (n) => { const c = n.cloneNode(true); c.querySelectorAll("button, .sec, .to-other, .hb-drawer, .block-editor").forEach((x) => x.remove()); c.querySelectorAll("sup").forEach((x) => x.replaceWith("^" + x.textContent)); c.querySelectorAll("td, th, li, br, dt, dd").forEach((x) => x.append(" ")); return c.textContent; };
+  let current = "doc", heads = [], links = new Map(), sections = [], io = null;
+
+  // Contents and search index for whichever view is showing.
+  function buildRail() {
+    const root = panes[current];
+    toc.textContent = ""; links = new Map();
+    heads = $$("h2, h3, h4", root).filter((h) => !h.closest("[data-nosearch]") && !h.closest("[hidden]"));
+    for (const h of heads) {
+      if (!h.id) { const sec = h.closest("section"); h.id = h.tagName === "H2" ? sec.id : sec.id + "-" + heads.indexOf(h); }
+      const li = el("li", h.tagName === "H2" ? "" : "sub"), a = el("a");
+      a.href = "#" + h.id;
+      const num = $(".sec", h);
+      a.append(el("span", "sec", num ? num.textContent.replace(/^§/, "").replace(/^Appendix /, "").replace(/\.$/, "") : ""), el("span", null, [...h.childNodes].filter((n) => n !== num && !(n.classList && n.classList.contains("to-other"))).map((n) => n.textContent).join("").trim()));
+      li.append(a); toc.append(li); links.set(h, a);
+    }
+    if (io) io.disconnect();
+    io = new IntersectionObserver((ents) => {
+      for (const e of ents) if (e.isIntersecting && links.has(e.target)) { for (const a of links.values()) a.classList.remove("here"); links.get(e.target).classList.add("here"); }
+    }, { rootMargin: "-10% 0px -75% 0px" });
+    heads.forEach((h) => io.observe(h));
+    sections = heads.map((h) => {
+      const parts = [];
+      let n = h.nextElementSibling;
+      while (n && !/^H[234]$/.test(n.tagName)) { if (!n.matches("[data-nosearch], figure")) parts.push(n); n = n.nextElementSibling; }
+      return { h, title: links.get(h).lastChild.textContent, text: (plain(h) + " " + parts.map(plain).join(" ")).replace(/\s+/g, " ").trim() };
+    });
+  }
+
+  function showView(name, target) {
+    if (name !== current) {
+      unmark();
+      current = name;
+      for (const [k, v] of Object.entries(panes)) v.hidden = k !== name;
+      $$(".pages button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === name)));
+      setTitles();
+      buildRail();
+      if (q.value.trim().length >= 2) search();
+    }
+    if (target) target.scrollIntoView({ block: "start" }); else if (target === null) window.scrollTo(0, 0);
+  }
+  $$(".pages button").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view, null)));
+  // Any in-page link may point into the other view.
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest('a[href^="#"]');
+    if (!a || a.closest(".results")) return;
+    const t = document.getElementById(decodeURIComponent(a.getAttribute("href").slice(1)));
+    if (!t) return;
+    const k = rfcOf(t), v = viewOf(t);
+    if (v === current && (!k || k === curKey)) return;
+    e.preventDefault();
+    if (k && k !== curKey) switchRfc(k);
+    showView(v, t);
+    history.replaceState(null, "", a.getAttribute("href"));
+  });
+
+  // Search: section results in the rail, every match marked in the text.
+  let hits = [], cur = -1;
+  function unmark() { for (const m of $$("mark.hit")) m.replaceWith(...m.childNodes); Object.values(panes).forEach((p) => p.normalize()); hits = []; cur = -1; }
+  const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escapeHtml = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  function markIn(root, re) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: (n) => n.parentElement.closest("[data-nosearch], [hidden], svg, script, style, figure, .rail, .ci-chip") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+    const nodes = []; while (walker.nextNode()) nodes.push(walker.currentNode);
+    for (const node of nodes) {
+      const t = node.nodeValue; re.lastIndex = 0;
+      if (!re.test(t)) continue;
+      re.lastIndex = 0;
+      const frag = document.createDocumentFragment(); let last = 0, m;
+      while ((m = re.exec(t))) { frag.append(t.slice(last, m.index)); frag.append(el("mark", "hit", m[0])); last = m.index + m[0].length; }
+      frag.append(t.slice(last)); node.replaceWith(frag);
+    }
+  }
+  function go(i) {
+    if (!hits.length) return;
+    cur = (i + hits.length) % hits.length;
+    hits.forEach((h, j) => h.classList.toggle("cur", j === cur));
+    hits[cur].scrollIntoView({ block: "center", behavior: motion() });
+    countEl.textContent = `${cur + 1} of ${hits.length}`;
+  }
+  let timer;
+  function search() {
+    unmark();
+    const term = q.value.trim();
+    if (term.length < 2) { results.hidden = true; meta.hidden = true; return; }
+    const re = new RegExp(escapeRe(term), "gi");
+    markIn(panes[current], re);
+    hits = $$("mark.hit", panes[current]);
+    meta.hidden = false;
+    countEl.textContent = hits.length ? `${hits.length} ${hits.length === 1 ? "match" : "matches"}` : "No matches";
+    results.textContent = ""; results.hidden = false;
+    let any = false;
+    for (const s of sections) {
+      const idx = s.text.toLowerCase().indexOf(term.toLowerCase());
+      if (idx < 0) continue;
+      any = true;
+      const n = (s.text.match(re) || []).length;
+      const a0 = Math.max(0, idx - 40), snip = (a0 ? "…" : "") + s.text.slice(a0, idx + term.length + 70) + "…";
+      const li = el("li"), a = el("a");
+      a.href = "#" + s.h.id;
+      a.innerHTML = `<b>${escapeHtml(s.title)} <span style="display:inline;font-weight:400">· ${n}</span></b><span>${escapeHtml(snip).replace(new RegExp(escapeRe(escapeHtml(term)), "gi"), (x) => `<mark>${x}</mark>`)}</span>`;
+      a.addEventListener("click", (e) => { e.preventDefault(); const first = hits.findIndex((m) => s.h.compareDocumentPosition(m) & Node.DOCUMENT_POSITION_FOLLOWING); go(first < 0 ? 0 : first); if (narrow()) setRail(false); });
+      li.append(a); results.append(li);
+    }
+    if (!any) results.append(el("li", "results-empty", "Nothing in this view matches. Try another view, a section number like 3.4, or a word like checksum."));
+  }
+  q.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(search, 120); });
+  q.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); if (!hits.length) search(); go(cur + (e.shiftKey ? -1 : 1)); }
+    if (e.key === "Escape") { q.value = ""; search(); q.blur(); }
+  });
+  $("#nextHit").addEventListener("click", () => go(cur + 1));
+  $("#prevHit").addEventListener("click", () => go(cur - 1));
+  $("#clearQ").addEventListener("click", () => { q.value = ""; search(); q.focus(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "/" && !e.target.closest("input, textarea")) { e.preventDefault(); if (narrow()) setRail(true); q.focus(); q.select(); }
+    if (e.key === "Escape" && rail.classList.contains("open")) setRail(false);
+  });
+
+  // ==FOSSIL==
+  // The draft lives in delta-rfc.fossil, shipped beside the page and opened by
+  // go-libfossil compiled to WebAssembly. Everything below reads from it.
+  let FILE = fileOf(curKey);
+  const repoState = $("#repoState"), facts = $("#repoFacts"), draftStatus = $("#draftStatus");
+  const P = (s) => { const v = JSON.parse(s); if (v && v.error) throw new Error(v.error); return v; };
+  const short = (u) => u.slice(0, 10);
+  const day = (iso) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  const num = (n) => n.toLocaleString("en-US");
+  let api = null, checkins = [], versions = [], viewing = null, annotations = [];
+
+  let repoBytes = null;
+  // A served file's bytes; fetchBytes.body keeps the response as served,
+  // which the conditional publish hashes.
+  async function fetchBytes(name) {
+    const res = await fetch(name);
+    if (!res.ok) throw new Error(name + ": HTTP " + res.status);
+    const body = new Uint8Array(await res.arrayBuffer());
+    fetchBytes.body = body;
+    if (!name.endsWith(".txt")) return body;
+    const bin = atob(dec.decode(body).replace(/\s+/g, ""));
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  // A one-file, uncompressed (stored) zip: local header, data, central directory, end record.
+  function zipOne(name, data, when) {
+    const crcTable = new Uint32Array(256).map((_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+    let crc = 0xffffffff; for (const b of data) crc = crcTable[(crc ^ b) & 0xff] ^ (crc >>> 8); crc = (crc ^ 0xffffffff) >>> 0;
+    const nm = enc.encode(name);
+    const dosTime = (when.getUTCHours() << 11) | (when.getUTCMinutes() << 5) | (when.getUTCSeconds() >> 1);
+    const dosDate = ((when.getUTCFullYear() - 1980) << 9) | ((when.getUTCMonth() + 1) << 5) | when.getUTCDate();
+    const local = new DataView(new ArrayBuffer(30)), central = new DataView(new ArrayBuffer(46)), end = new DataView(new ArrayBuffer(22));
+    const common = (v, o) => { v.setUint16(o, 20, true); v.setUint16(o + 2, 0, true); v.setUint16(o + 4, 0, true); v.setUint16(o + 6, dosTime, true); v.setUint16(o + 8, dosDate, true); v.setUint32(o + 10, crc, true); v.setUint32(o + 14, data.length, true); v.setUint32(o + 18, data.length, true); v.setUint16(o + 22, nm.length, true); };
+    local.setUint32(0, 0x04034b50, true); common(local, 4);
+    central.setUint32(0, 0x02014b50, true); central.setUint16(4, 20, true); common(central, 6);
+    end.setUint32(0, 0x06054b50, true); end.setUint16(8, 1, true); end.setUint16(10, 1, true);
+    end.setUint32(12, 46 + nm.length, true); end.setUint32(16, 30 + nm.length + data.length, true);
+    return new Blob([local, nm, data, central, nm, end], { type: "application/zip" });
+  }
+  async function loadFossil() {
+    if (typeof Go !== "function") throw new Error("the Go runtime (wasm_exec.js) did not load");
+    let buf = await fetchBytes(HOST === "worker" ? "rfcrepo.wasm.gz" : "rfcrepo-wasm-gz.txt");
+    if (buf[0] === 0x1f && buf[1] === 0x8b) {
+      buf = new Uint8Array(await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer());
+    }
+    const go = new Go();
+    const { instance } = await WebAssembly.instantiate(buf, go.importObject);
+    await new Promise((ready) => { window.onFossilReady = ready; go.run(instance); });
+    return window.fossil;
+  }
+  // Open one RFC's repository; its state lives in states[key] from then on.
+  const states = {};
+  async function openRepo(key) {
+    const bytes = await fetchBytes(repoFileOf(key));
+    // The conditional publish needs the stored file's SHA-256: hash it as served.
+    const digest = await crypto.subtle.digest("SHA-256", fetchBytes.body);
+    const sha = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    const info = P(api.open(key, bytes.slice()));
+    states[key] = { repoBytes: bytes, originalRepoBytes: bytes.slice(), repoSha: sha, repoInfo: info, pendingText: null };
+    const tool = (window.RFC_TOOLS || {})[key];
+    if (tool && tool.onRepo) { try { tool.onRepo(apiFor(key), toolCtx); } catch (err) { console.error(err); } }
+  }
+  // A view of the API pinned to one RFC's repository, for that RFC's tools.
+  function apiFor(key) {
+    const out = {};
+    for (const name of Object.keys(api)) out[name] = (...args) => { api.use(key); try { return api[name](...args); } finally { if (api.use) api.use(curKey); } };
+    return out;
+  }
+
+  // Draft view: versions, inline history, and editing for Editors.
+  let viewMode = "text", pendingText = null, canEdit = false, artifactApi = null, repoSha = null, originalRepoBytes = null;
+  const texts = new Map(), maps = new Map();
+  const textOf = (uuid) => { if (!texts.has(uuid)) texts.set(uuid, P(api.read(uuid, FILE)).text); return texts.get(uuid); };
+  const linesOf = (uuid) => textOf(uuid).split("\n");
+  const tipUuid = () => versions[0].uuid;
+  // Line history is optional: if annotate fails, the text still renders without it.
+  function annotateSafe(uuid) {
+    try { const a = P(api.annotate(FILE, uuid)); return Array.isArray(a) ? a : []; }
+    catch (err) { console.warn("annotate unavailable:", err.message || err); return []; }
+  }
+  const isPageLine = (l) => /^Hipp, et al\.\s+Expires .*\[Page \d+\]$/.test(l) || /^Internet-Draft\s+Fossil Delta Format/.test(l);
+  const plainOf = (ls) => ls.filter((l) => !isPageLine(l)).map((l) => l.trim()).filter(Boolean)
+    .reduce((acc, l) => (acc === "" ? l : /[A-Za-z]-$/.test(acc) ? acc + l : acc + " " + l), "").replace(/\s+/g, " ");
+
+  // map[i] = the line of B that line i of A (1-based) is kept as, or 0 if A changed it.
+  function lcsMap(A, B) {
+    const n = A.length, m = B.length, map = new Int32Array(n + 2);
+    let s = 0; while (s < n && s < m && A[s] === B[s]) { map[s + 1] = s + 1; s++; }
+    let e = 0; while (e < n - s && e < m - s && A[n - 1 - e] === B[m - 1 - e]) { map[n - e] = m - e; e++; }
+    const a = A.slice(s, n - e), b = B.slice(s, m - e), W = b.length + 1;
+    const dp = new Uint16Array((a.length + 1) * W);
+    for (let x = a.length - 1; x >= 0; x--) for (let y = b.length - 1; y >= 0; y--)
+      dp[x * W + y] = a[x] === b[y] ? dp[(x + 1) * W + y + 1] + 1 : Math.max(dp[(x + 1) * W + y], dp[x * W + y + 1]);
+    for (let x = 0, y = 0; x < a.length && y < b.length;) {
+      if (a[x] === b[y]) { map[s + x + 1] = s + y + 1; x++; y++; }
+      else if (dp[(x + 1) * W + y] >= dp[x * W + y + 1]) x++; else y++;
+    }
+    return map;
+  }
+  const versionMap = (i) => { const k = versions[i].uuid; if (!maps.has(k)) maps.set(k, lcsMap(linesOf(versions[i].uuid), linesOf(versions[i + 1].uuid))); return maps.get(k); };
+
+  // A block's own history: follow its lines back through each version, bounded by the
+  // nearest unchanged lines around it, and record every version that changed its words.
+  function blockHistory(vi, a, b) {
+    const entries = [];
+    let idx = vi, lo = a, hi = b, cur = plainOf(linesOf(versions[idx].uuid).slice(lo - 1, hi));
+    while (idx + 1 < versions.length) {
+      const map = versionMap(idx), N = linesOf(versions[idx].uuid).length, M = linesOf(versions[idx + 1].uuid).length;
+      let p = lo - 1; while (p >= 1 && !map[p]) p--;
+      let q = hi + 1; while (q <= N && !map[q]) q++;
+      const olo = (p >= 1 ? map[p] : 0) + 1, ohi = (q <= N ? map[q] : M + 1) - 1;
+      const older = olo <= ohi ? plainOf(linesOf(versions[idx + 1].uuid).slice(olo - 1, ohi)) : "";
+      if (older !== cur) entries.push({ v: versions[idx], before: older, after: cur });
+      if (!older) return { entries, origin: versions[idx], added: true };
+      idx++; lo = olo; hi = ohi; cur = older;
+    }
+    return { entries, origin: versions[idx], added: false };
+  }
+
+  function wordDiff(before, after) {
+    const A = before ? before.split(/(\s+)/) : [], B = after ? after.split(/(\s+)/) : [];
+    if (A.length * B.length > 400000) return [["del", before], ["ins", after]];
+    const W = B.length + 1, dp = new Uint16Array((A.length + 1) * W);
+    for (let x = A.length - 1; x >= 0; x--) for (let y = B.length - 1; y >= 0; y--)
+      dp[x * W + y] = A[x] === B[y] ? dp[(x + 1) * W + y + 1] + 1 : Math.max(dp[(x + 1) * W + y], dp[x * W + y + 1]);
+    const out = [], push = (k, t) => { if (out.length && out[out.length - 1][0] === k) out[out.length - 1][1] += t; else out.push([k, t]); };
+    // Mostly rewritten text reads best as the old version, then the new one.
+    const words = (T) => T.filter((t) => !/^\s*$/.test(t)).length;
+    const kept = Math.floor(dp[0] / 2);
+    if (kept < 0.4 * Math.max(words(A), words(B))) return [["del", before], ["", before && after ? " " : ""], ["ins", after]].filter(([, t]) => t);
+    // Walk the alignment; gather each changed run (spaces inside it included) and
+    // emit it as one removed phrase followed by one added phrase.
+    let x = 0, y = 0, del = "", ins = "", gap = "";
+    const inRun = () => del !== "" || ins !== "";
+    const flush = () => {
+      const tail = (ins.match(/\s+$/) || del.match(/\s+$/) || [""])[0];
+      del = del.trimEnd(); ins = ins.trimEnd();
+      if (del) push("del", del);
+      if (del && ins) push("", " ");
+      if (ins) push("ins", ins);
+      if (tail) push("", tail);
+      del = ins = "";
+    };
+    const open = () => { if (!inRun() && gap) { push("", gap); gap = ""; } };
+    while (x < A.length || y < B.length) {
+      if (x < A.length && y < B.length && A[x] === B[y]) {
+        if (/^\s+$/.test(A[x])) { gap += A[x]; x++; y++; continue; }
+        if (inRun()) flush();
+        if (gap) { push("", gap); gap = ""; }
+        push("", A[x]); x++; y++;
+      } else if (y < B.length && (x >= A.length || dp[x * W + y + 1] >= dp[(x + 1) * W + y])) {
+        open(); if (gap) { del += gap; ins += gap; gap = ""; } ins += B[y]; y++;
+      } else {
+        open(); if (gap) { del += gap; ins += gap; gap = ""; } del += A[x]; x++;
+      }
+    }
+    if (inRun()) flush();
+    if (gap) push("", gap);
+    return out;
+  }
+
+  const currentTip = () => pendingText ?? textOf(tipUuid());
+  // The header's two columns are padded with spaces to 72; split each line at
+  // its run of spaces instead, so the columns can sit at the body's edges.
+  function ietfHead(text) {
+    const out = [], [top, ...rest] = text.split(/\n\s*\n/);
+    for (const line of top.split("\n")) {
+      const m = line.match(/^(\S.*?)?(?:\s{2,}(\S.*))?$/) || [];
+      out.push(el("span", "l", (m[1] || "").trim()), el("span", "r", (m[2] || "").trim()));
+    }
+    rest.join("\n\n").split("\n").filter((l) => l.trim()).forEach((l, i) => {
+      const t = el("span", "t", l.trim());
+      if (i === 0) t.classList.add("gap");
+      out.push(t);
+    });
+    return out;
+  }
+  const unhtml = (h) => { const d = document.createElement("textarea"); d.innerHTML = h; return d.value; };
+  function renderDraft() {
+    const atTip = viewing === tipUuid(), text = atTip ? currentTip() : textOf(viewing);
+    const r = rfcRender(text, { codeTerms: CODE_TERMS[curKey] });
+    $("#draftHead").replaceChildren(...ietfHead(unhtml(r.head)));
+    const body = $("#draftBody");
+    body.innerHTML = r.body + `<details class="boiler"><summary>Status of This Memo and Copyright Notice</summary><div>${r.boiler}</div></details>`;
+    body.classList.toggle("history", viewMode === "history");
+    body.classList.toggle("editing", viewMode === "edit");
+    panes.draft.classList.toggle("blame", viewMode === "changes");
+    addIllustratedChips();
+    // Per-line attribution for whatever is on screen; unsaved lines have none.
+    let anno = annotations;
+    if (atTip && pendingText != null) {
+      const map = lcsMap(text.split("\n"), linesOf(tipUuid()));
+      anno = Array.from({ length: text.split("\n").length }, (_, i) => (map[i + 1] ? annotations[map[i + 1] - 1] : { pending: true }));
+    }
+    const vi = versions.findIndex((v) => v.uuid === viewing), first = vi === versions.length - 1;
+    let marked = 0, pend = 0;
+    for (const node of $$("[data-ln]", body)) {
+      const [a, b] = node.dataset.ln.split("-").map(Number), span = anno.slice(a - 1, b);
+      if (span.some((l) => l && l.pending)) { node.dataset.pending = ""; pend++; }
+      else if (!first && span.some((l) => l && l.uuid === viewing)) { node.dataset.ciNew = ""; node.title = `Changed in ${short(viewing)}, ${day(versions[vi].time)}`; marked++; }
+      if (/^H\d$/.test(node.tagName) || node.tagName === "DT") continue;
+      if (viewMode === "history" && !node.hasAttribute("data-pending")) addHistoryChip(node, vi, a, b, span);
+      if (viewMode === "edit" && atTip) addEditChip(node, a, b);
+    }
+    $$("#versionSeg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.uuid === viewing)));
+    $$("#modeSeg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === viewMode)));
+    const v = versions[vi];
+    draftStatus.textContent = `Read from the repository: check-in ${short(v.uuid)}, ${day(v.time)}. ` +
+      (pend && atTip ? `${pend} blocks have unsaved edits.` :
+        viewMode === "history" ? "Each block names the check-in that last changed it; open one to see its history." :
+        viewMode === "edit" ? "Choose Edit on any block to change its text." :
+        first ? "This is the first version, so every line is new." : `${marked} blocks changed in this version.`);
+    updateCommitBar(pend);
+    if (current === "draft") { buildRail(); if (q.value.trim().length >= 2) search(); }
+    if (viewMode !== "edit") addRails(body, "pre.rfc-fig");
+  }
+  function showVersion(uuid) {
+    viewing = uuid;
+    annotations = annotateSafe(uuid);
+    if (uuid !== tipUuid() && viewMode === "edit") viewMode = "text";
+    renderDraft();
+  }
+  $$("#modeSeg button").forEach((b) => b.addEventListener("click", () => {
+    viewMode = b.dataset.mode;
+    if (viewMode === "edit" && viewing !== tipUuid()) { viewing = tipUuid(); annotations = annotateSafe(viewing); }
+    renderDraft();
+  }));
+
+  function addHistoryChip(node, vi, a, b, span) {
+    let best = -1;
+    for (const l of span) { const k = l ? versions.findIndex((v) => v.uuid === l.uuid) : -1; if (k >= 0 && (best < 0 || k < best)) best = k; }
+    if (best < 0) return;
+    const v = versions[best], chip = el("button", "ci-chip c" + Math.min(best, 3));
+    chip.type = "button";
+    chip.append(el("span", "h", short(v.uuid)), ` · ${day(v.time)}`);
+    chip.title = `Last changed in ${short(v.uuid)} by ${v.user}: ${v.comment}`;
+    chip.setAttribute("aria-expanded", "false");
+    chip.addEventListener("click", () => {
+      const open = chip.getAttribute("aria-expanded") === "true";
+      if (node._drawer) { node._drawer.remove(); node._drawer = null; }
+      chip.setAttribute("aria-expanded", String(!open));
+      if (open) return;
+      const h = blockHistory(vi, a, b), d = el("div", "hb-drawer");
+      d.dataset.nosearch = "";
+      if (!h.entries.length) d.append(el("p", "hb-origin", `Unchanged since the first version, ${short(h.origin.uuid)} (${day(h.origin.time)}).`));
+      for (const e of h.entries) {
+        const entry = el("div", "hb-entry"), meta = el("div", "meta"), words = el("div", "words");
+        meta.append(el("span", "h", short(e.v.uuid)), ` · ${day(e.v.time)} · ${e.v.user} · ${e.v.comment}`);
+        for (const [k, t] of wordDiff(e.before, e.after)) words.append(k ? el(k, null, t) : t);
+        entry.append(meta, words); d.append(entry);
+      }
+      if (h.entries.length) d.append(el("p", "hb-origin", h.added ? `This block first appears in ${short(h.origin.uuid)} (${day(h.origin.time)}).` : `Before that, unchanged since the first version, ${short(h.origin.uuid)} (${day(h.origin.time)}).`));
+      if (node.tagName === "LI" || node.tagName === "DD") node.append(d); else node.after(d);
+      node._drawer = d;
+    });
+    node.prepend(chip);
+  }
+
+  function addEditChip(node, a, b) {
+    const chip = el("button", "ci-chip edit", "Edit");
+    chip.type = "button";
+    chip.addEventListener("click", () => {
+      if (node._editor) { node._editor.querySelector("textarea").focus(); return; }
+      const lines = currentTip().split("\n").slice(a - 1, b);
+      const box = el("div", "block-editor"), ta = el("textarea"), row = el("div", "row");
+      box.dataset.nosearch = "";
+      ta.value = lines.join("\n"); ta.rows = Math.min(18, lines.length + 1); ta.setAttribute("aria-label", `Lines ${a} to ${b} of the draft`);
+      const keep = el("button", "btn primary", "Keep this edit"), cancel = el("button", "btn", "Cancel");
+      keep.type = cancel.type = "button";
+      row.append(keep, cancel, el("small", null, `Lines ${a}–${b}, exactly as stored. Keep the three-space indent.`));
+      box.append(ta, row);
+      keep.addEventListener("click", () => {
+        const all = currentTip().split("\n");
+        all.splice(a - 1, b - a + 1, ...ta.value.replace(/\s+$/, "").split("\n"));
+        const next = all.join("\n");
+        pendingText = next === textOf(tipUuid()) ? null : next;
+        stash(); renderDraft();
+      });
+      cancel.addEventListener("click", () => { box.remove(); node._editor = null; });
+      if (node.tagName === "LI" || node.tagName === "DD") node.append(box); else node.after(box);
+      node._editor = box; ta.focus();
+    });
+    node.prepend(chip);
+  }
+
+  function updateCommitBar(pend) {
+    const bar = $("#commitBar");
+    bar.hidden = !(canEdit && pendingText != null);
+    $("#pendingCount").textContent = `${pend} edited ${pend === 1 ? "block" : "blocks"}`;
+    const u = $("#commitUser");
+    if (!u.value) { try { u.value = localStorage.getItem("fossil-user") || ""; } catch {} }
+  }
+  $("#discardBtn").addEventListener("click", () => { pendingText = null; clearStash(); $("#commitNote").textContent = ""; renderDraft(); });
+
+  const STASH = () => "rfc-pending-" + curKey;
+  function stash(msg) { try { if (pendingText == null) sessionStorage.removeItem(STASH()); else sessionStorage.setItem(STASH(), JSON.stringify({ base: tipUuid(), text: pendingText, msg: msg ?? $("#commitMsg").value })); } catch {} }
+  function clearStash() { try { sessionStorage.removeItem(STASH()); } catch {} }
+  // Edits stashed before a reload come back; if the draft moved on meanwhile,
+  // each edited region is re-applied where its surrounding lines still match.
+  function restoreStash() {
+    let s = null; try { s = JSON.parse(sessionStorage.getItem(STASH()) || "null"); } catch {}
+    if (!s) return "";
+    if (s.msg) $("#commitMsg").value = s.msg;
+    if (s.base === tipUuid()) { pendingText = s.text; return "Your unsaved edits are back."; }
+    if (!versions.some((v) => v.uuid === s.base)) { clearStash(); return ""; }
+    const base = linesOf(s.base), mine = s.text.split("\n"), map = lcsMap(base, mine), tip = linesOf(tipUuid());
+    const hunks = []; let x = 1, y = 1;
+    while (x <= base.length || y <= mine.length) {
+      if (x <= base.length && map[x] === y) { x++; y++; continue; }
+      const h = { from: x, to: x - 1, lines: [] };
+      while (x <= base.length && !map[x]) { h.to = x; x++; }
+      const until = x <= base.length ? map[x] : mine.length + 1;
+      while (y < until) { h.lines.push(mine[y - 1]); y++; }
+      hunks.push(h);
+    }
+    let out = tip.slice(), applied = 0;
+    for (const h of hunks.reverse()) {
+      const ctx = base.slice(Math.max(0, h.from - 2), h.to + 1).join("\n");
+      const at = out.join("\n").indexOf(ctx);
+      if (at < 0) continue;
+      const start = out.join("\n").slice(0, at).split("\n").length - 1 + (h.from - 1 - Math.max(0, h.from - 2));
+      out.splice(start, h.to - h.from + 1, ...h.lines); applied++;
+    }
+    pendingText = applied ? out.join("\n") : null;
+    stash();
+    return applied === hunks.length ? `The draft moved on to ${short(tipUuid())}; your edits were re-applied on top of it.` :
+      `The draft moved on to ${short(tipUuid())}; ${applied} of ${hunks.length} edited regions could be re-applied.`;
+  }
+
+  async function detectEditor() {
+    if (!window.claude || typeof window.claude.use !== "function") return;
+    const [u, art] = await Promise.all([window.claude.use("user"), window.claude.use("artifact")]);
+    artifactApi = art;
+    canEdit = !!(art && u && (await u.canEdit()));
+    $('#modeSeg [data-mode="edit"]').hidden = !canEdit;
+    if (canEdit && pendingText != null) renderDraft();
+  }
+
+  const wrap76 = (b64) => b64.replace(/.{76}/g, "$&\n");
+  const b64bytes = (b64) => { const bin = atob(b64); const out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; };
+  $("#commitBtn").addEventListener("click", async () => {
+    const msg = $("#commitMsg").value.trim(), user = $("#commitUser").value.trim(), note = $("#commitNote"), btn = $("#commitBtn");
+    if (!msg || !user) { note.textContent = "Add a check-in comment and your fossil user name."; return; }
+    if (!artifactApi) { note.textContent = "Publishing isn't available in this view."; return; }
+    try { localStorage.setItem("fossil-user", user); } catch {}
+    btn.disabled = true; note.textContent = "Checking in…";
+    stash(msg);
+    let made;
+    try { made = P(api.commit(FILE, pendingText, msg, user)); } catch (e) { note.textContent = e.message; btn.disabled = false; return; }
+    const ex = P(api.export());
+    note.textContent = `Checked in ${short(made.uuid)}. Publishing…`;
+    try {
+      const path = repoFileOf(curKey);
+      const res = await artifactApi.publish({ [path]: { content: wrap76(ex.base64), contentType: "text/plain", ifMatch: repoSha } });
+      if (res && res.shas && res.shas[path]) repoSha = res.shas[path];
+      repoBytes = b64bytes(ex.base64); originalRepoBytes = repoBytes.slice();
+      Object.assign(states[curKey], { repoBytes, originalRepoBytes, repoSha });
+      pendingText = null; clearStash(); $("#commitMsg").value = "";
+      refreshRepo();
+      note.textContent = `Committed ${short(made.uuid)} and published. Everyone with this page open moves to it.`;
+      $("#commitBar").hidden = false;
+    } catch (e) {
+      P(api.open(curKey, originalRepoBytes.slice())); texts.clear(); maps.clear();
+      const code = e && e.code;
+      note.textContent = code === "conflict" ? "Someone committed first. This page is reloading to their version; your edits are kept and come back after the reload." :
+        code === "not_writer" || code === "not_granted" || code === "capability_disabled" ? "This view can read the page but not publish to it, so the check-in was not kept. Your edits are still here." :
+        `Publishing didn't work (${code || e.message}), so the check-in was not kept. Your edits are still here; try again.`;
+    } finally { btn.disabled = false; }
+  });
+
+  function saveState() {
+    if (!states[curKey]) return;
+    Object.assign(states[curKey], { pendingText, repoSha, originalRepoBytes, repoBytes, viewing });
+  }
+  function loadState(key) {
+    const st = states[key];
+    pendingText = st.pendingText; repoSha = st.repoSha; originalRepoBytes = st.originalRepoBytes; repoBytes = st.repoBytes; repoInfo = st.repoInfo;
+  }
+  function setTitles() {
+    const r = RFCS[curKey];
+    $("#railTitle").innerHTML = `${r.title}<small>draft-fossil-${r.name}-00</small>`;
+    $("#topTitle").textContent = current === "repo" ? fossilNameOf(curKey) : current === "draft" ? `draft-fossil-${r.name}-00` : r.title;
+    $("#repoEyebrow").textContent = `${fossilNameOf(curKey)} · running in your browser`;
+    $("#downloadRepo").textContent = `Download ${fossilNameOf(curKey)}`;
+    $$("#repo .topic").forEach((sec) => (sec.hidden = sec.dataset.topic !== curKey));
+  }
+  // Before a repository is open, the draft view shows text rendered at build time.
+  const fallback = JSON.parse($("#fallbackData").textContent);
+  function renderFallback(key) {
+    const f = fallback[key];
+    $("#draftHead").replaceChildren(...ietfHead(unhtml(f.head)));
+    $("#draftBody").innerHTML = f.body + `<details class="boiler"><summary>Status of This Memo and Copyright Notice</summary><div>${f.boiler}</div></details>`;
+    addIllustratedChips();
+    addRails($("#draftBody"), "pre.rfc-fig");
+  }
+  function clearRepoView(message) {
+    repoState.className = "status"; repoState.textContent = message;
+    facts.replaceChildren(repoState);
+    $("#timeline").replaceChildren(el("li", "tl-empty", message));
+    $("#manifest").textContent = ""; $("#diff").textContent = ""; $("#diffStats").textContent = "";
+    $("#storage").innerHTML = `<tr><td colspan="5">${message}</td></tr>`;
+    $("#decodeStats").textContent = ""; $("#decodeStrip").textContent = ""; $("#decodeNote").textContent = ""; $("#decodeMore").hidden = true;
+    $("#versionSeg").replaceChildren(el("button", null, "Loading…"));
+    $$("#modeSeg button").forEach((b) => (b.disabled = true));
+    $("#commitBar").hidden = true;
+  }
+  let switching = 0;
+  async function switchRfc(key) {
+    if (key === curKey || !RFCS[key]) return;
+    saveState();
+    unmark();
+    $$("main.illus").forEach((m) => (m.hidden = true));
+    curKey = key; FILE = fileOf(key);
+    $$(".rfc-pick button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.rfc === key)));
+    if (current === "doc") panes.doc.hidden = false;
+    setTitles();
+    $("#commitNote").textContent = "";
+    const ticket = ++switching;
+    if (api && states[key]) {
+      api.use(key); loadState(key); refreshRepo(); restoreStashOnce(key);
+    } else {
+      renderFallback(key);
+      draftStatus.textContent = api ? "Opening this draft's repository…" : "Read from the repository once Fossil loads.";
+      clearRepoView(api ? "Opening the repository…" : "Loading Fossil (6 MB)");
+      if (api) {
+        try { await openRepo(key); if (ticket === switching && curKey === key) { api.use(key); loadState(key); refreshRepo(); restoreStashOnce(key); } }
+        catch (err) { if (curKey === key) clearRepoView("This repository couldn't be opened here: " + (err.message || err)); }
+      }
+    }
+    buildRail();
+    if (q.value.trim().length >= 2) search();
+    window.scrollTo(0, 0);
+  }
+  $$(".rfc-pick button").forEach((b) => b.addEventListener("click", () => switchRfc(b.dataset.rfc)));
+  const restored = new Set();
+  function restoreStashOnce(key) {
+    if (restored.has(key)) return;
+    restored.add(key);
+    const note = restoreStash();
+    if (note) { renderDraft(); $("#commitNote").textContent = note; }
+  }
+
+  // Repository view.
+  const CARD = {
+    A: "An attachment", B: "The baseline manifest this one is a delta of",
+    C: "The comment, with spaces written as \\s",
+    D: "When the check-in was made, in UTC",
+    F: "A file: its name, then the hash of its content",
+    K: "A ticket id", L: "A wiki page name", N: "The comment's mimetype",
+    P: "The parent check-in", Q: "A cherry-pick",
+    R: "MD5 over every file in the check-in, so a reader can confirm the set is complete",
+    T: "A tag: a branch or symbolic name, propagated to descendants with *",
+    U: "Who made the check-in",
+    W: "Wiki text",
+    Z: "MD5 of every line above, so the manifest checks itself",
+  };
+  function showManifest(uuid) {
+    $$("#timeline button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.uuid === uuid)));
+    const text = P(api.artifact(uuid)).text, box = $("#manifest");
+    box.textContent = "";
+    const head = el("div", "card");
+    head.append(el("code", null, `artifact ${uuid}`), el("span", null, "Its SHA3-256 hash: the hash of the text below is the check-in's name."));
+    box.append(head);
+    for (const line of text.split("\n").filter(Boolean)) {
+      const row = el("div", "card"), c = el("code");
+      c.append(el("b", null, line[0]), line.slice(1));
+      let why = CARD[line[0]] || "A card";
+      if (line[0] === "F") why += line.split(" ")[2]?.length === 64 ? " (SHA3-256)" : " (SHA1)";
+      row.append(c, el("span", null, why));
+      box.append(row);
+    }
+  }
+  function renderTimeline() {
+    const list = $("#timeline");
+    list.textContent = "";
+    for (const ci of checkins) {
+      const li = el("li"), b = el("button");
+      b.type = "button"; b.dataset.uuid = ci.uuid;
+      b.append(el("span", "dot"), el("span", "hash", short(ci.uuid)), el("span", "msg", ci.comment), el("span", "when", `${day(ci.time)} · ${ci.user}${ci.parents.length ? "" : " · root"}`));
+      b.addEventListener("click", () => showManifest(ci.uuid));
+      li.append(b); list.append(li);
+    }
+    showManifest(checkins[0].uuid);
+  }
+  function renderDiff() {
+    const [newer, older] = versions;
+    const lines = P(api.diff(older.uuid, newer.uuid, FILE)).unified.split("\n");
+    const box = $("#diff"), frag = document.createDocumentFragment();
+    let add = 0, del = 0;
+    for (const l of lines) {
+      const cls = l.startsWith("+++") || l.startsWith("---") ? "meta" : l.startsWith("@@") ? "hunk" : l[0] === "+" ? "add" : l[0] === "-" ? "del" : "";
+      if (cls === "add") add++; else if (cls === "del") del++;
+      frag.append(el("div", cls, l || " "));
+    }
+    box.replaceChildren(frag);
+    $("#diffStats").innerHTML = `<span>${short(older.uuid)} → ${short(newer.uuid)}</span><span><b>${add}</b> lines added</span><span><b>${del}</b> lines removed</span>`;
+  }
+  let stored = [];
+  function renderStorage() {
+    stored = P(api.storage());
+    const what = new Map();
+    for (const ci of checkins) what.set(ci.uuid, `Check-in manifest, ${day(ci.time)}`);
+    for (const v of versions) what.set(v.fileUuid, `The draft text, ${day(v.time)}`);
+    const rows = stored.map((s) => {
+      const src = s.srcUuid ? `Delta against ${short(s.srcUuid)}` : "Whole, compressed";
+      const pct = Math.max(2, Math.round((s.stored / s.size) * 100));
+      return `<tr><td class="num">${short(s.uuid)}</td><td>${what.get(s.uuid) || "Artifact"}</td><td class="num">${num(s.size)} B</td><td class="num">${num(s.stored)} B<span class="bar" style="width:${pct}%"></span></td><td>${src}</td></tr>`;
+    });
+    $("#storage").innerHTML = rows.join("");
+    $("#decodeStored").disabled = !stored.some((s) => s.delta);
+    $("#decodeStats").textContent = ""; $("#decodeStrip").textContent = ""; $("#decodeNote").textContent = ""; $("#decodeMore").hidden = true;
+  }
+  function decodeStored(all) {
+    const fileUuids = new Set(versions.map((v) => v.fileUuid));
+    const s = stored.find((x) => x.delta && fileUuids.has(x.uuid) && fileUuids.has(x.srcUuid)) || stored.find((x) => x.delta);
+    const delta = Uint8Array.from(atob(s.delta), (c) => c.charCodeAt(0));
+    const srcVersion = versions.find((v) => v.fileUuid === s.srcUuid), outVersion = versions.find((v) => v.fileUuid === s.uuid);
+    if (!srcVersion || !outVersion) { $("#decodeNote").innerHTML = `<span class="status bad">This delta is not between two versions of the draft</span>`; return; }
+    const src = enc.encode(P(api.read(srcVersion.uuid, FILE)).text);
+    const res = Delta.apply(src, delta);
+    const expected = enc.encode(P(api.read(outVersion.uuid, FILE)).text);
+    const same = res.ok && res.out.length === expected.length && res.out.every((b, i) => b === expected[i]);
+    const copies = res.steps.filter((x) => x.type === "copy"), lits = res.steps.filter((x) => x.type === "literal");
+    $("#decodeStats").innerHTML = `<span>delta <b>${num(delta.length)}</b> B</span><span><b>${copies.length}</b> copies, <b>${num(copies.reduce((n, x) => n + x.count, 0))}</b> B from the ${day(srcVersion.time)} text</span><span><b>${lits.length}</b> literals, <b>${num(lits.reduce((n, x) => n + x.count, 0))}</b> B carried in the delta</span><span>checksum ${res.ok ? "verified" : "failed"}</span>`;
+    $("#decodeNote").innerHTML = res.ok
+      ? `<span class="status ${same ? "ok" : "bad"}">${same ? `Rebuilt ${num(res.out.length)} bytes, identical to the ${day(outVersion.time)} draft` : "Output differs from the stored draft"}</span>`
+      : `<span class="status bad">Rejected · ${res.msg}</span>`;
+    const r = roles(delta, res), limit = all ? delta.length : Math.min(delta.length, 480);
+    renderStrip($("#decodeStrip"), [...delta.subarray(0, limit)], (i) => r[i]);
+    $("#decodeMore").hidden = all || limit >= delta.length;
+  }
+  $("#decodeStored").addEventListener("click", () => decodeStored(false));
+  $("#decodeAll").addEventListener("click", () => decodeStored(true));
+
+  // ---- Topic demos: one per RFC, in the Repository view ----
+  const motionOK = () => !matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, motionOK() ? ms : 0));
+  const cellText = (td, text, cls) => { td.textContent = text; if (cls) td.className = cls; return td; };
+
+  // Artifact Format: re-hash every stored artifact.
+  $("#namesRun").addEventListener("click", () => {
+    const rows = P(api.nameCheck()), body = $("#namesRows");
+    body.textContent = "";
+    let ok = 0, manifests = 0, zok = 0;
+    for (const n of rows) {
+      const tr = el("tr");
+      tr.append(cellText(el("td"), short(n.uuid), "num"), cellText(el("td"), n.kind === "check-in" ? "check-in manifest" : "file content"), cellText(el("td"), num(n.size), "num"));
+      const h = el("td", "hash");
+      h.append(el("span", n.ok ? "mark-ok" : "mark-bad", n.ok ? "✓ " : "✗ "), `${n.alg} ${n.hash.slice(0, 16)}…`);
+      tr.append(h, cellText(el("td"), n.cards ? n.cards.split("").join(" ") : "—", "cards"));
+      const z = el("td");
+      if (n.zcard) { manifests++; const m = n.zcard === n.zcheck; if (m) zok++; z.append(el("span", m ? "mark-ok" : "mark-bad", m ? "✓ matches" : "✗ differs")); } else z.textContent = "—";
+      tr.append(z);
+      if (n.ok) ok++;
+      body.append(tr);
+    }
+    $("#namesStats").innerHTML = `<span><b>${ok}</b> of <b>${rows.length}</b> names match their bytes</span><span><b>${manifests}</b> manifests</span><span><b>${zok}</b> Z cards match</span>`;
+  });
+
+  // Repository State: erase the derived tables and rebuild them.
+  $("#rebuildRun").addEventListener("click", async () => {
+    const btn = $("#rebuildRun"), body = $("#rebuildRows"), note = $("#rebuildNote");
+    btn.disabled = true; note.textContent = "";
+    const r = P(api.rebuildDemo());
+    body.textContent = "";
+    const cells = r.tables.map((t) => {
+      const tr = el("tr", "pending"), c = [el("td"), el("td", "num"), el("td", "num"), el("td", "num"), el("td")];
+      c[0].append(el("code", null, t.name)); tr.append(...c); body.append(tr);
+      return { t, tr, c };
+    });
+    for (const x of cells) x.c[1].textContent = num(x.t.rows);
+    await sleep(450);
+    for (const x of cells) x.c[2].textContent = num(x.t.erased);
+    await sleep(450);
+    for (const x of cells) {
+      x.tr.classList.remove("pending");
+      x.c[3].textContent = num(x.t.after);
+      if (x.t.same) x.c[4].append(el("span", "mark-ok", "✓ identical"));
+      else {
+        const d = el("div", "diffs");
+        for (const k of x.t.diffs) {
+          const line = el("div");
+          line.append(el("span", "mark-bad", "≠ "), el("code", null, k.column), ` in ${k.rows} ${k.rows === 1 ? "row" : "rows"}: `, el("code", null, k.before), " → ", el("code", null, k.after));
+          d.append(line);
+        }
+        x.c[4].append(d);
+      }
+      await sleep(150);
+    }
+    const same = r.tables.filter((t) => t.same).length;
+    $("#rebuildStats").innerHTML = `<span><b>${r.artifacts}</b> artifacts read</span><span>rebuilt in <b>${r.ms}</b> ms</span><span><b>${same}</b> of <b>${r.tables.length}</b> tables identical</span>`;
+    note.textContent = same === r.tables.length
+      ? "Every table came back exactly as Fossil wrote it: the state really is a function of the artifacts."
+      : "Every table came back with the same rows, rebuilt from the artifacts alone. Where values differ, go-libfossil's rebuild computes them differently from Fossil's own, so these are places it does not yet match Fossil exactly.";
+    btn.disabled = false;
+  });
+
+  // Sync Protocol: a real pull or push between two in-memory copies, animated.
+  const SYNC_CARD = {
+    "#": ["A random comment that makes the request unique", "§5.3"],
+    pragma: ["A pragma: which client is talking, or an extra request", "§9"],
+    login: ["Signs the request as a user, so a push is allowed", "§6.1"],
+    push: ["Asks to send artifacts, naming the server and project codes", "§8.5"],
+    pull: ["Asks to receive artifacts, naming the server and project codes", "§8.5"],
+    clone: ["Asks for the whole repository", "§8"],
+    clone_seqno: ["Where the next clone round would resume", "§8.2"],
+    igot: ["I have this artifact", "§8.6"],
+    gimme: ["Please send me this artifact", "§8.6"],
+    file: ["The artifact itself: its bytes, whole or as a delta", "§7.1"],
+    cfile: ["The artifact itself, compressed", "§7.2"],
+    cookie: ["A value to send back next round", "§3.6"],
+    error: ["The other side refused something", "§10.1"],
+    message: ["A text message for the user", "§10.2"],
+  };
+  const cardsOf = (text) => text.split("\n").filter((l) => l && !l.startsWith("…")).map((l) => (l.startsWith("#") ? "#" : l.split(" ")[0]));
+  const filesIn = (text) => text.split("\n").filter((l) => /^c?file /.test(l)).map((l) => l.split(" ")[1]);
+  function summarize(text) {
+    const seen = [], count = {};
+    for (const c of cardsOf(text)) { if (["pragma", "#", "cookie"].includes(c)) continue; if (!(c in count)) seen.push(c); count[c] = (count[c] || 0) + 1; }
+    return seen.slice(0, 2).map((c) => (count[c] > 1 ? `${c} ×${count[c]}` : c)).join(" · ") || "pragma";
+  }
+
+  const sync = { kind: "pull", demos: {}, step: 0, playing: false, items: [], states: [] };
+  function prepareSync() {
+    sync.demos = {}; sync.playing = false;
+    ["syncPlay", "syncStep", "syncReset"].forEach((id) => ($("#" + id).disabled = !api));
+    $("#syncWhat").textContent = "Pull: the server has a new check-in · Push: the client has one";
+    loadScenario(sync.kind);
+  }
+  function loadScenario(kind) {
+    sync.kind = kind; sync.step = 0; sync.playing = false;
+    $$("#syncKind button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.kind === kind)));
+    $("#syncPlay").textContent = "Play";
+    let d = sync.demos[kind];
+    if (!d) { try { d = sync.demos[kind] = P(api.syncDemo(kind)); } catch (err) { $("#syncStage").innerHTML = `<p class="placeholder">This sync couldn't run here: ${err.message}</p>`; return; } }
+    // One cell per artifact, in the same place on both sides.
+    const kinds = new Map(), order = [];
+    for (const a of [...d.after.server, ...d.after.client, ...d.before.server, ...d.before.client]) if (!kinds.has(a.uuid)) { kinds.set(a.uuid, a.kind); order.push(a.uuid); }
+    const old = order.filter((u) => d.before.client.some((a) => a.uuid === u) && d.before.server.some((a) => a.uuid === u));
+    const fresh = order.filter((u) => !old.includes(u));
+    sync.items = [...old, ...fresh].map((u) => ({ uuid: u, kind: kinds.get(u) }));
+    // States: before, then after each message.
+    let client = new Set(d.before.client.map((a) => a.uuid)), server = new Set(d.before.server.map((a) => a.uuid));
+    sync.states = [{ client: new Set(client), server: new Set(server), arrived: new Set(), msg: null }];
+    for (const r of d.rounds) {
+      const sent = filesIn(r.request); sent.forEach((u) => server.add(u));
+      sync.states.push({ client: new Set(client), server: new Set(server), arrived: new Set(sent), msg: { round: r, dir: "request" } });
+      const got = filesIn(r.response); got.forEach((u) => client.add(u));
+      sync.states.push({ client: new Set(client), server: new Set(server), arrived: new Set(got), msg: { round: r, dir: "reply" } });
+    }
+    drawStage(0);
+    showMessage(0);
+  }
+
+  function stageSource(st) {
+    const C = 3, cw = 0.68, ch = 0.48, pad = 0.18, th = 0.66, gap = 1.5;
+    const rows = Math.max(1, Math.ceil(sync.items.length / C)), pw = C * cw + 2 * pad, ph = th + rows * ch + pad;
+    const L = ["margin = 0.12in", `boxwid = ${cw}`, `boxht = ${ch}`];
+    const side = (x0, title, sub, held) => {
+      L.push(`box wid ${pw} ht ${ph} at (${x0 + pw / 2}, ${-ph / 2})`);
+      L.push(`text "${title}" bold at (${x0 + pw / 2}, -0.24)`, `text "${sub}" small at (${x0 + pw / 2}, -0.44)`);
+      sync.items.forEach((it, i) => {
+        const x = x0 + pad + (i % C) * cw + cw / 2, y = -(th + Math.floor(i / C) * ch + ch / 2);
+        const has = held.has(it.uuid), isNew = has && st.arrived.has(it.uuid);
+        L.push(`box "${it.uuid.slice(0, 6)}" mono bold "${it.kind}" small at (${x}, ${y})${has ? "" : " dashed"}${isNew ? " fill 0x0C0003" : ""}`);
+      });
+    };
+    side(0, "client", "your cloned copy", st.client);
+    side(pw + gap, "server", "the remote", st.server);
+    const mid = -(th + (rows * ch) / 2), a = pw + 0.16, b = pw + gap - 0.16;
+    L.push(`arrow from (${a}, ${mid + 0.24}) to (${b}, ${mid + 0.24}) color 0x0C0009`, `text "request" small at (${(a + b) / 2}, ${mid + 0.42})`);
+    L.push(`arrow from (${b}, ${mid - 0.24}) to (${a}, ${mid - 0.24}) color 0x0C000A`, `text "reply" small at (${(a + b) / 2}, ${mid - 0.42})`);
+    return L.join("\n");
+  }
+  async function drawStage(i) {
+    let render;
+    try { render = await pikchrReady; } catch { $("#syncStage").innerHTML = '<p class="placeholder">The diagram renderer did not load here.</p>'; return; }
+    const svg = render(stageSource(sync.states[i]));
+    if (!svg.trimStart().startsWith("<svg")) { $("#syncStage").textContent = svg; return; }
+    const themed = svg
+      .replace(/<path ([^>]*?)stroke:rgb\(12,0,9\);/g, '<path data-role="request" $1stroke:currentColor;')
+      .replace(/<path ([^>]*?)stroke:rgb\(12,0,10\);/g, '<path data-role="reply" $1stroke:currentColor;')
+      .replace(/rgb\(12,0,(9|10)\)/g, "currentColor").replace(/rgb\(0,0,0\)/g, "currentColor").replace(/rgb\(12,0,3\)/g, "var(--lit-tint)");
+    const stage = $("#syncStage");
+    stage.innerHTML = themed;
+    const w = (svg.match(/viewBox="0 0 ([\d.]+)/) || [])[1];
+    if (w) stage.style.setProperty("--pk-w", Math.round(parseFloat(w)) + "px");
+    $("#syncProgress").textContent = i === 0 ? "Before the sync" : `Message ${i} of ${sync.states.length - 1}`;
+  }
+  // Move a labelled pill along the request or reply arrow.
+  function flyToken(dir, label) {
+    const svg = $("#syncStage svg"), path = svg && svg.querySelector(`path[data-role="${dir}"]`);
+    if (!path || !motionOK()) return Promise.resolve();
+    const NS = "http://www.w3.org/2000/svg", g = document.createElementNS(NS, "g"), rect = document.createElementNS(NS, "rect"), text = document.createElementNS(NS, "text");
+    text.textContent = label;
+    text.setAttribute("text-anchor", "middle"); text.setAttribute("dominant-baseline", "central");
+    text.setAttribute("style", "font: 600 16px var(--sans); fill: var(--frame)");
+    g.append(rect, text); svg.append(g);
+    const tw = text.getComputedTextLength() + 28, th = 30;
+    rect.setAttribute("x", -tw / 2); rect.setAttribute("y", -th / 2); rect.setAttribute("width", tw); rect.setAttribute("height", th); rect.setAttribute("rx", th / 2);
+    rect.setAttribute("style", "fill: var(--frame-tint)");
+    const total = path.getTotalLength(), dur = 1300, t0 = performance.now();
+    // Frames drive the motion when the page is visible; a timer keeps it moving
+    // (and guarantees it ends) when frames are paused, as in a background tab.
+    return new Promise((done) => {
+      let finished = false;
+      const finish = () => { if (finished) return; finished = true; g.remove(); done(); };
+      const place = (now) => {
+        const k = Math.min(1, (now - t0) / dur), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+        const pt = path.getPointAtLength(e * total);
+        g.setAttribute("transform", `translate(${pt.x}, ${pt.y})`);
+        return k >= 1;
+      };
+      const frame = (now) => { if (finished) return; if (place(now)) setTimeout(finish, 160); else requestAnimationFrame(frame); };
+      requestAnimationFrame(frame);
+      const timer = setInterval(() => { if (finished) return clearInterval(timer); if (document.hidden && place(performance.now())) { clearInterval(timer); finish(); } }, 50);
+      setTimeout(() => { clearInterval(timer); finish(); }, dur + 600);
+    });
+  }
+  function showMessage(i) {
+    const box = $("#syncMsg"), st = sync.states[i], d = sync.demos[sync.kind];
+    box.textContent = "";
+    if (!st.msg) {
+      const lead = el("div", "mh");
+      const what = sync.kind === "pull" ? "The server has a check-in the client lacks: a new manifest and the changed file." : "The client made a check-in the server lacks: a new manifest and the changed file.";
+      lead.append(el("b", null, "Before the sync"), el("span", null, what));
+      box.append(lead);
+      if (d.error) box.append(el("p", "mark-bad", d.error));
+      return;
+    }
+    const r = st.msg.round, text = st.msg.dir === "request" ? r.request : r.response;
+    const head = el("div", "mh");
+    head.append(el("b", null, `Round ${r.n} · ${st.msg.dir}`), el("span", null, st.msg.dir === "request" ? `client → server · ${num(r.reqBytes)} bytes` : `server → client · ${num(r.resBytes)} bytes`));
+    if (st.arrived.size) head.append(el("span", null, `${st.arrived.size} ${st.arrived.size === 1 ? "artifact" : "artifacts"} arrived`));
+    box.append(head);
+    const counts = new Map();
+    for (const c of cardsOf(text)) counts.set(c, (counts.get(c) || 0) + 1);
+    const wrap = el("div", "tbl-wrap"), table = el("table"), tb = el("tbody");
+    table.append(Object.assign(el("thead"), { innerHTML: "<tr><th>Card</th><th>How many</th><th>What it says</th><th>Section</th></tr>" }), tb);
+    for (const [c, n] of counts) {
+      const tr = el("tr"), info = SYNC_CARD[c] || ["A card this table does not describe", ""];
+      tr.append(el("td", "card", c), el("td", "num", String(n)), el("td", null, info[0]), el("td", "sec", info[1]));
+      tb.append(tr);
+    }
+    wrap.append(table); box.append(wrap);
+    const raw = el("details"), pre = el("pre");
+    // Open by default, and it stays as the reader last left it.
+    raw.open = syncRawOpen;
+    raw.addEventListener("toggle", () => (syncRawOpen = raw.open));
+    raw.append(el("summary", null, "The message as sent"));
+    pre.textContent = text.replace(/\b([0-9a-f]{12})[0-9a-f]{28,52}\b/g, "$1…").trim();
+    raw.append(pre); box.append(raw);
+  }
+  let syncRawOpen = true;
+  async function advance() {
+    if (sync.step >= sync.states.length - 1) return false;
+    const next = sync.step + 1, st = sync.states[next];
+    showMessage(next);
+    await flyToken(st.msg.dir, summarize(st.msg.dir === "request" ? st.msg.round.request : st.msg.round.response));
+    sync.step = next;
+    await drawStage(next);
+    return true;
+  }
+  $("#syncStep").addEventListener("click", async () => { if (sync.busy) return; sync.busy = true; await advance(); sync.busy = false; });
+  $("#syncPlay").addEventListener("click", async () => {
+    if (sync.playing) { sync.playing = false; $("#syncPlay").textContent = "Play"; return; }
+    if (sync.step >= sync.states.length - 1) { sync.step = 0; await drawStage(0); showMessage(0); }
+    sync.playing = true; $("#syncPlay").textContent = "Pause";
+    while (sync.playing && !sync.busy) { sync.busy = true; const more = await advance(); sync.busy = false; if (!more) break; await sleep(900); }
+    sync.playing = false; $("#syncPlay").textContent = "Play";
+  });
+  $("#syncReset").addEventListener("click", () => { sync.playing = false; sync.step = 0; drawStage(0); showMessage(0); $("#syncPlay").textContent = "Play"; });
+  $$("#syncKind button").forEach((b) => b.addEventListener("click", () => { if (api) loadScenario(b.dataset.kind); }));
+
+  function prepareTopics() {
+    $("#namesRun").disabled = !api; $("#rebuildRun").disabled = !api;
+    $("#namesWhat").textContent = "SHA3-256 and SHA1, recomputed in your browser";
+    $("#rebuildWhat").textContent = "On a throwaway copy; this repository is untouched";
+    $("#namesRows").innerHTML = '<tr><td colspan="6">Press the button to hash every artifact.</td></tr>'; $("#namesStats").textContent = "";
+    $("#rebuildRows").innerHTML = '<tr><td colspan="5">Press the button to run it on a throwaway copy.</td></tr>'; $("#rebuildStats").textContent = ""; $("#rebuildNote").textContent = "";
+    if (curKey === "sp") prepareSync();
+  }
+
+  // Download: the platform only saves allow-listed types, so the repository ships zipped.
+  $("#downloadRepo").addEventListener("click", async () => {
+    const note = $("#downloadNote"), button = $("#downloadRepo");
+    if (!repoBytes) { note.textContent = "The repository is still loading. Try again in a moment."; return; }
+    const downloads = window.claude && typeof window.claude.use === "function" ? await window.claude.use("downloads") : null;
+    if (!downloads) {
+      // Served on its own, the browser saves the repository file directly.
+      const name = fossilNameOf(curKey), a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([repoBytes], { type: "application/octet-stream" }));
+      a.download = name; document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+      note.innerHTML = `Saved. Run <code>fossil ui ${name}</code>.`;
+      return;
+    }
+    button.disabled = true;
+    try {
+      const tip = checkins[0] ? new Date(checkins[0].time) : new Date();
+      const name = fossilNameOf(curKey);
+      await downloads.save({ filename: name.replace(/\.fossil$/, ".zip"), data: zipOne(name, repoBytes, tip) });
+      note.innerHTML = `Saved. Unzip it and run <code>fossil ui ${name}</code>.`;
+    } catch (e) {
+      note.textContent = e && e.code === "declined" ? "Download cancelled." : e && e.code === "rate_limited" ? "A save prompt is already open." : "The download couldn't start here.";
+    } finally { button.disabled = false; }
+  });
+
+  function renderFacts(info) {
+    const v = P(api.verify());
+    repoState.className = "status " + (v.ok ? "ok" : "bad");
+    repoState.textContent = v.ok ? "Opened and verified" : "Verification failed";
+    facts.replaceChildren(repoState, ...[
+      ["project", info.projectName],
+      ["check-ins", checkins.length],
+      ["artifacts", stored.length],
+      ["hash check", v.ok ? `every artifact matches its name (${v.ms} ms)` : v.message],
+    ].map(([k, val]) => { const s = el("span"); s.append(`${k} `, el("b", null, String(val))); return s; }));
+  }
+  let repoInfo = null;
+  function refreshRepo() {
+    texts.clear(); maps.clear();
+    checkins = P(api.timeline());
+    versions = [];
+    for (const ci of checkins) {
+      const f = P(api.files(ci.uuid)).find((x) => x.Name === FILE);
+      if (f && !versions.some((v) => v.fileUuid === f.UUID)) versions.push({ uuid: ci.uuid, time: ci.time, fileUuid: f.UUID, user: ci.user, comment: ci.comment });
+    }
+    const seg = $("#versionSeg");
+    seg.textContent = "";
+    versions.forEach((v, i) => {
+      const b = el("button", null, `${day(v.time)}${i === 0 ? " · tip" : ""}`);
+      b.type = "button"; b.dataset.uuid = v.uuid; b.title = `${short(v.uuid)} · ${v.comment}`;
+      b.addEventListener("click", () => showVersion(v.uuid));
+      seg.append(b);
+    });
+    $$("#modeSeg button").forEach((b) => (b.disabled = false));
+    viewing = tipUuid();
+    annotations = annotateSafe(viewing);
+    renderDraft();
+    renderTimeline(); renderDiff(); renderStorage(); renderFacts(repoInfo);
+    prepareTopics();
+  }
+  async function startFossil() {
+    try {
+      api = await loadFossil();
+      const key = curKey;
+      await openRepo(key);
+      if (curKey === key) { api.use(key); loadState(key); refreshRepo(); restoreStashOnce(key); }
+      else { const k = curKey; await openRepo(k); api.use(k); loadState(k); refreshRepo(); restoreStashOnce(k); }
+      detectEditor();
+    } catch (err) {
+      repoState.className = "status bad";
+      repoState.textContent = "Fossil didn't load here";
+      facts.append(el("span", null, String(err.message || err)));
+      draftStatus.textContent = "Showing the text built into the page; the repository couldn't be opened in this view.";
+      $("#timeline").replaceChildren(el("li", "tl-empty", "The repository couldn't be opened in this view."));
+    }
+  }
+  (window.requestIdleCallback || ((f) => setTimeout(f, 300)))(() => startFossil());
+
+  // Each RFC's illustrated tools render at load, before any repository is open.
+  const toolCtx = { el, $, $$, enc, dec, P };
+  for (const [key, tool] of Object.entries(window.RFC_TOOLS || {})) {
+    const root = $("#illus-" + key);
+    if (root && tool.init) { try { tool.init(root, toolCtx); } catch (err) { console.error(err); } }
+  }
+  renderFallback(curKey);
+  setTitles();
+
+  buildRail();
+  const start = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
+  if (start && rfcOf(start) && rfcOf(start) !== curKey) switchRfc(rfcOf(start));
+  if (start && viewOf(start) !== "doc") showView(viewOf(start), start);
+  else if (start) start.scrollIntoView({ block: "start" });
+})();
+</script>

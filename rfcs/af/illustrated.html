@@ -1,0 +1,579 @@
+    <header class="hero">
+      <div class="eyebrow">draft-fossil-artifact-format-00 · an illustrated reading</div>
+      <h1>The Fossil Artifact Format</h1>
+      <p class="lede">Fossil keeps a project as a set of artifacts, each named by the hash of its own bytes. Some hold the contents of files. The rest are short text documents built from cards, and they record everything else: check-ins, tags, wiki pages, tickets. Here is a whole one, the root check-in from the draft's Appendix A.1.1.</p>
+      <div class="tool wide" data-nosearch id="af-hero">
+        <div class="tool-h"><b>A check-in manifest, card by card. Point at a token to read it.</b><span>127 bytes · 6 cards · named by SHA-1</span></div>
+        <div id="af-hero-cards"></div>
+        <div id="af-hero-note">Six cards, one per line, in alphabetical order of their letters. The SHA-1 hash of these 127 bytes is the artifact's name.</div>
+        <div class="legend">
+          <span><i style="background:var(--frame-tint)"></i>card letter</span>
+          <span><i style="background:var(--copy-tint)"></i>token</span>
+          <span><i style="background:var(--lit-tint)"></i>checksum of the bytes above</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="prose" id="af-s1">
+      <h2 data-draft="s1"><span class="sec">§1–2</span>What an artifact is</h2>
+      <p>An artifact is an immutable byte sequence named by the cryptographic hash of its content. A repository's project state is the unordered set of artifacts it holds. The order they were added in does not matter, and two repositories holding the same set represent the same project state.</p>
+      <p>There are two kinds. A <b>content artifact</b> is any byte sequence, such as one version of a file. A <b>structural artifact</b> is a text document built from cards that records relationships among artifacts: a check-in, a wiki page, a ticket change, and five other types. Both kinds are named and stored the same way. A reader tells them apart by attempting a structural parse.</p>
+      <p>Artifacts are added but never changed or removed in normal operation. A name is a function of content, so an artifact received from any peer is identical to the same artifact held locally, and two repositories converge by exchanging the artifacts each lacks. The draft calls this a grow-only set. User accounts, settings and the map from names to local storage are local state, outside the artifact model. Content may be stored or sent as a delta, which changes neither its bytes nor its name.</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td>Card</td><td>One line of a structural artifact: a letter, then zero or more space-separated tokens.</td></tr>
+          <tr><td>Token</td><td>A maximal run of bytes in a card containing neither space (0x20) nor LF (0x0a).</td></tr>
+          <tr><td>Decoded form</td><td>A token's value after its escapes are decoded (§4.3).</td></tr>
+          <tr><td>Stripped content</td><td>An artifact's bytes once any signature wrapper is removed (§4.1.1).</td></tr>
+          <tr><td>Manifest</td><td>The structural artifact that records a check-in.</td></tr>
+          <tr><td>Baseline manifest</td><td>A manifest with no B card. Its F cards list every file.</td></tr>
+          <tr><td>Delta manifest</td><td>A manifest with a B card. Its F cards list only differences from the baseline the B card names (§8).</td></tr>
+        </tbody>
+      </table></div>
+      <p>The draft defines these terms for the whole Fossil suite: the Delta Format, Sync Protocol and Repository State drafts reuse them without restating them. It uses <span class="req">MUST</span>, <span class="req">SHOULD</span> and <span class="req">MAY</span> in the BCP 14 sense, and only when capitalised.</p>
+    </section>
+
+    <section class="prose" id="af-s3">
+      <h2 data-draft="s3"><span class="sec">§3</span>Naming an artifact</h2>
+      <h3 id="af-s3-1" data-draft="s3-1"><span class="sec">§3.1</span>The hash of the stored bytes</h3>
+      <p>An artifact's name is the hash of its complete raw bytes, taken as one blob. Nothing is added before hashing, and nothing is canonicalised, re-encoded or stripped: the bytes hashed <span class="req">MUST</span> be exactly the stored bytes. A signed artifact's stored bytes include its signature wrapper, so its name covers the wrapper too.</p>
+      <p>When content arrives together with a name, the receiver's storage step uses that supplied name as the candidate rather than computing a new one. Checking that the name matches the content is a separate job for the caller (§3.4).</p>
+
+      <h3 id="af-s3-2" data-draft="s3-2"><span class="sec">§3.2</span>Two algorithms, told apart by length</h3>
+      <p>A name is either 40 hexadecimal digits, a SHA-1 hash, or 64, a SHA3-256 hash. A candidate of any other length <span class="req">MUST</span> be rejected, and the length check comes before any check of the characters. The lengths never overlap, so the length alone says which algorithm made a name. Validation, verification and display all dispatch on it, and there is no other algorithm marker.</p>
+      <p>SHA3-256 here is the FIPS 202 function, with the 01 domain-separation padding, which differs from the original Keccak submission. Both are written as lowercase hexadecimal. Which of the two names newly stored content is the hash policy's choice (§7).</p>
+
+      <h3 id="af-s3-3" data-draft="s3-3"><span class="sec">§3.3</span>Lowercase, compared exactly</h3>
+      <p>Every name an implementation computes or emits <span class="req">MUST</span> be lowercase. A token with an uppercase digit is therefore not a valid name and can never verify. A parser <span class="req">MAY</span> reject it when it validates the token, or <span class="req">MAY</span> accept it there and let it fail verification later. The two choices interoperate because conforming data never contains one. A parser that accepts uppercase <span class="req">MUST NOT</span> lowercase it.</p>
+      <div class="tool wide" data-nosearch id="af-name">
+        <div class="tool-h"><b>Name some bytes</b><span>UTF-8 text, hashed both ways</span></div>
+        <div class="field"><label for="af-name-in">Artifact bytes</label><textarea id="af-name-in" rows="6" spellcheck="false"></textarea></div>
+        <div class="field"><label for="af-name-cand">A name to verify against them</label><input id="af-name-cand" spellcheck="false"></div>
+        <div class="row"><span id="af-name-status"></span><span class="stats" id="af-name-why"></span></div>
+        <div class="readout" id="af-name-out"></div>
+      </div>
+
+      <h3 id="af-s3-4" data-draft="s3-4"><span class="sec">§3.4</span>Verifying a name</h3>
+      <p>Verification picks the algorithm by length, hashes the content, and compares the candidate byte for byte with the digest written in lowercase. A 40-digit name is checked against SHA-1, a 64-digit name against SHA3-256, and any other length never verifies. The caller sees one failure signal: a wrong length, a non-hex character and a digest mismatch look the same. When a receiver is handed a name:</p>
+      <ol class="plain">
+        <li>It parses the token as a name and selects it as the candidate storage name.</li>
+        <li>Normally it rebuilds the full bytes, checks them against the name, and only then stores the artifact. If the check fails, the artifact <span class="req">MUST NOT</span> be treated as verified under that name. The receiver makes this check; the storage step does not.</li>
+        <li>Some paths store first and check later: a clone, and a delta whose source has not arrived yet. Being stored under a name is never proof that the name was checked.</li>
+        <li>Storage then uses the name to find duplicates and to decide whether the repository must switch to SHA3 names (§7.4).</li>
+      </ol>
+
+      <h3 id="af-s3-5" data-draft="s3-5"><span class="sec">§3.5</span>Grammar</h3>
+      <pre class="code wide" data-abnf>lhexdig        = DIGIT / %x61-66             ; 0-9 / a-f
+hexdig-ci      = DIGIT / %x41-46 / %x61-66   ; 0-9 / A-F / a-f
+
+artifact-name  = sha1-name / sha3-name        ; what writers MUST produce
+sha1-name      = 40lhexdig
+sha3-name      = 64lhexdig
+
+accepted-name  = 40hexdig-ci / 64hexdig-ci    ; what a parser may tolerate</pre>
+
+      <h3 id="af-s3-6" data-draft="s3-6"><span class="sec">§3.6</span>Looking up a prefix</h3>
+      <p class="cite">Informative. Prefix lookup is a local convenience, not part of the format.</p>
+      <p>A lookup takes 4 to 64 hexadecimal characters and lowercases them, unlike the parse path. It then matches the prefix against all names without caring whether they are 40 or 64 digits long. If more than one artifact matches, the name is ambiguous, and a SHA-1 name colliding with a SHA3 name is reported the same way as two names of one kind.</p>
+    </section>
+
+    <section class="prose" id="af-s4">
+      <h2 data-draft="s4"><span class="sec">§4</span>Cards</h2>
+      <p>A structural artifact is a sequence of cards. This section covers how a parser frames the bytes, removes a signature, splits lines and tokens, decodes escapes, enforces order and repetition, and checks each card's tokens.</p>
+
+      <h3 id="af-s4-1" data-draft="s4-1"><span class="sec">§4.1</span>Four gates before the first card</h3>
+      <p>A parser <span class="req">MUST</span> pass these gates, in this order, before it interprets any card:</p>
+      <ol class="plain">
+        <li>The input is not empty and its last byte is LF. This is checked on the raw bytes, so a signed artifact's outer wrapper must end in LF.</li>
+        <li>Any signature wrapper is removed (§4.1.1). The stripped content also ends in LF, because the cut keeps the LF before the signature armor.</li>
+        <li>Line 1 meets a stricter rule than other cards: the stripped content is at least 10 bytes long, its first byte is a letter A–Z and its second byte is a space. A first card with no arguments fails here, although argument-less cards are allowed later.</li>
+        <li>The Z card checksum is verified (§6.2). A Z card that is present but wrong <span class="req">MUST</span> cause rejection. A missing Z card passes this gate and is caught later by §5.2.</li>
+      </ol>
+      <p>When the card loop ends, any bytes left over <span class="req">MUST</span> cause rejection.</p>
+
+      <h3 id="af-s4-1-1" data-draft="s4-1-1"><span class="sec">§4.1.1</span>Removing a signature wrapper</h3>
+      <p>A reader <span class="req">MUST</span> remove both PGP clearsign wrappers and SSH signed wrappers before parsing:</p>
+      <ol class="plain">
+        <li>Stripping happens only when the first 34 bytes are exactly <code>-----BEGIN PGP SIGNED MESSAGE-----</code> or <code>-----BEGIN SSH SIGNED MESSAGE-----</code>.</li>
+        <li>The body starts after the first blank line, found as LF LF or LF CR LF. That CR is the only CR the whole parse pipeline tolerates. With no blank line, nothing is stripped.</li>
+        <li>A backward scan cuts the content at the first <code>LF-----BEGIN PGP SIGNATURE-----</code> or <code>LF-----BEGIN SSH SIGNATURE-----</code>, keeping that LF as the last byte. With no match, the content runs to the end.</li>
+      </ol>
+      <p>The armor literals are 30 bytes but only 29 are compared, so an armor line one dash short, followed by any byte, also matches. A receiver that does not know the SSH prefix leaves it in place; the artifact then fails the line-1 gate and is treated as a content artifact.</p>
+      <!--FIG:af-extents-->
+      <p>The name, the card parser and the Z checksum each read a different stretch of the same bytes (§9). The name covers every stored byte, and so does signature verification when it is done. The parser reads the stripped content. The Z checksum covers the stripped content up to its final 35 bytes. Implementations <span class="req">MUST</span> keep these apart: wrapper bytes never enter the Z checksum and always enter the name. A signed artifact and its unsigned inner content are two artifacts with two names.</p>
+
+      <h3 id="af-s4-1-2" data-draft="s4-1-2"><span class="sec">§4.1.2</span>Sterilization</h3>
+      <p class="cite">Informative.</p>
+      <p>To make content deliberately unparseable as a structural artifact, a writer adds a first line starting with <code>#</code>, such as <code># Remove this line to create a well-formed Fossil artifact.</code> It fails the line-1 gate. For signed content the marker goes just before the signature block, so the signature stays at the end. A fast well-formedness probe and a full parser <span class="req">SHOULD</span> give the same verdict on every input.</p>
+
+      <h3 id="af-s4-2" data-draft="s4-2"><span class="sec">§4.2</span>Lines and tokens</h3>
+      <pre class="code wide" data-abnf>card        = card-letter ( SP card-args LF / LF )
+card-letter = %x41-5A                   ; A-Z; 21 letters defined
+card-args   = token *( SP token )
+token       = 1*tchar
+tchar       = %x00-09 / %x0B-1F / %x21-FF   ; any byte but space and LF</pre>
+      <p>The byte after the card letter <span class="req">MUST</span> be exactly one space, when arguments follow, or LF. Anything else makes the card invalid, a tab included. Tokens split on space and LF only, so a tab is part of a token and a token can never hold a space. A CR is an ordinary token byte. One card is not one line: the W card's body may contain LF bytes (§4.7.18).</p>
+
+      <h3 id="af-s4-2-1" data-draft="s4-2-1"><span class="sec">§4.2.1</span>Exact arity</h3>
+      <p>Each card's grammar fixes its maximum number of tokens as well as its minimum. A card with more tokens than its grammar allows <span class="req">MUST</span> cause the whole artifact to be rejected: a second token on B, C, G, H, I, K, L, N, R, U, W or Z, a third on J or on the two-token Q, a fourth on A, a fifth on F. The same rule rejects bytes left after the last card.</p>
+
+      <h3 id="af-s4-2-2" data-draft="s4-2-2"><span class="sec">§4.2.2</span>A closed alphabet</h3>
+      <p>Exactly 21 card letters are defined. A letter outside A–Z <span class="req">MUST</span> be rejected, and so <span class="req">MUST</span> the five unused capitals. There is no path for accepting unknown letters from a future version.</p>
+      <div class="wide" aria-label="The 26 capital letters; 21 are card letters">
+        <div class="strip" id="af-alpha"><span class="b frame">A</span><span class="b frame">B</span><span class="b frame">C</span><span class="b frame">D</span><span class="b frame">E</span><span class="b frame">F</span><span class="b frame">G</span><span class="b frame">H</span><span class="b frame">I</span><span class="b frame">J</span><span class="b frame">K</span><span class="b frame">L</span><span class="b frame">M</span><span class="b frame">N</span><span class="b">O</span><span class="b frame">P</span><span class="b frame">Q</span><span class="b frame">R</span><span class="b">S</span><span class="b frame">T</span><span class="b frame">U</span><span class="b">V</span><span class="b frame">W</span><span class="b">X</span><span class="b">Y</span><span class="b frame">Z</span></div>
+        <div class="legend"><span><i style="background:var(--frame-tint)"></i>a card letter</span><span><i style="background:var(--panel);border:1px solid var(--rule)"></i>rejected</span></div>
+      </div>
+
+      <h3 id="af-s4-3" data-draft="s4-3"><span class="sec">§4.3</span>Escapes</h3>
+      <p>Tokens that carry free text are escaped so they contain no space or LF. The decoder <span class="req">MUST</span> recognise exactly eight pairs:</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Escape</th><th>Byte</th><th>Escape</th><th>Byte</th></tr></thead>
+        <tbody>
+          <tr><td class="num">\n</td><td>LF (0x0a)</td><td class="num">\v</td><td>VT (0x0b)</td></tr>
+          <tr><td class="num">\s</td><td>space (0x20)</td><td class="num">\f</td><td>FF (0x0c)</td></tr>
+          <tr><td class="num">\t</td><td>tab (0x09)</td><td class="num">\0</td><td>NUL (0x00)</td></tr>
+          <tr><td class="num">\r</td><td>CR (0x0d)</td><td class="num">\\</td><td>backslash (0x5c)</td></tr>
+        </tbody>
+      </table></div>
+      <p>A backslash before any other character is dropped and the character kept, so <code>\q</code> decodes to <code>q</code>. A backslash that ends a token stays a backslash. Neither raises an error.</p>
+
+      <h3 id="af-s4-3-1" data-draft="s4-3-1"><span class="sec">§4.3.1</span>Which tokens are decoded</h3>
+      <p>Decoding applies at exactly 12 token positions on 9 card letters. Hashes, checksums, timestamps and the W card are never decoded, so every token of B, D, E, G, I, K, M, P, Q, R, W and Z is read raw.</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Card</th><th>Decoded</th><th>Never decoded</th></tr></thead>
+        <tbody>
+          <tr><td class="num">A</td><td>filename, target</td><td>source hash</td></tr>
+          <tr><td class="num">C</td><td>comment</td><td></td></tr>
+          <tr><td class="num">F</td><td>filename, old name</td><td>hash, permission</td></tr>
+          <tr><td class="num">H</td><td>thread title</td><td></td></tr>
+          <tr><td class="num">J</td><td>value</td><td>field name</td></tr>
+          <tr><td class="num">L</td><td>wiki title</td><td></td></tr>
+          <tr><td class="num">N</td><td>mimetype</td><td></td></tr>
+          <tr><td class="num">T</td><td>tag name, value</td><td>target hash</td></tr>
+          <tr><td class="num">U</td><td>login, when not empty</td><td></td></tr>
+        </tbody>
+      </table></div>
+      <p>The A card target is the one hash-bearing position decoded before it is validated, because it may hold a wiki name instead (§4.7.2). Validation sees the decoded value, so a token full of escapes <span class="req">MAY</span> decode to pure hex, and is then checked as a hash like any other.</p>
+
+      <h3 id="af-s4-4" data-draft="s4-4"><span class="sec">§4.4</span>Card order</h3>
+      <p>Card letters <span class="req">MUST</span> never decrease: each card's letter is greater than or equal to the one before. Equal letters may follow each other, which is how repeatable cards work. One exception is normative. An N card <span class="req">MAY</span> follow a P card when the artifact has already shown a valid E card, which makes it a technote; a parser <span class="req">MUST</span> accept that, and <span class="req">MUST</span> reject every other out-of-order card. Appendix A.1.2 is such a technote. Two consequences:</p>
+      <ul class="plain">
+        <li><b>B comes before F.</b> By the time any F card is checked, the parser knows whether a B card exists, so it can decide in one forward pass whether F cards need a hash.</li>
+        <li><b>Nothing comes after Z.</b> Z is the last letter, and the checksum framing fixes the Z card as exactly the final 35 bytes of the stripped content: <code>Z</code>, a space, 32 hex digits, LF. Being last is enforced by order plus byte position. The Z card's own grammar checks only its token.</li>
+      </ul>
+
+      <h3 id="af-s4-5" data-draft="s4-5"><span class="sec">§4.5</span>Once, or many times</h3>
+      <p>Twenty letters fall into two classes (§4.5.1). A duplicate of a <b>single-occurrence</b> card <span class="req">MUST</span> be rejected: A, B, C, D, E, G, H, I, K, L, N, R, U, W. A <b>repeatable</b> card adds to a list: F, J, M, T, P, Q. Z is in neither. It has no duplicate check; an earlier Z line is simply content covered by the final checksum, which looks only at the last 35 bytes.</p>
+      <p>Runs of repeatable cards have their own order (§4.5.2):</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Card</th><th>Within its run</th></tr></thead>
+        <tbody>
+          <tr><td class="num">F</td><td>Strictly ascending by decoded filename. Equal or descending is rejected.</td></tr>
+          <tr><td class="num">J</td><td>Strictly ascending by field name.</td></tr>
+          <tr><td class="num">M</td><td>Strictly ascending by hash.</td></tr>
+          <tr><td class="num">T</td><td>Ascending by name, then by target hash. Equal names need strictly increasing hashes.</td></tr>
+          <tr><td class="num">P</td><td>Not sorted or deduplicated. The order means something: primary parent first.</td></tr>
+          <tr><td class="num">Q</td><td>No order and no duplicate check.</td></tr>
+        </tbody>
+      </table></div>
+      <p>The F check runs on the decoded name, after decoding. It is what lets a reader binary-search a baseline's file list and merge a delta manifest with its baseline (§8.2).</p>
+
+      <h3 id="af-s4-5-3" data-draft="s4-5-3"><span class="sec">§4.5.3</span>One comparator</h3>
+      <p>The F, J, M and T checks, the merge walk and single-name lookup all compare the same way: raw bytes as unsigned values, with no locale, no Unicode normalisation and no case folding. A string sorts before any longer string that starts with it, an absent value sorts before any present one, and <code>/</code> is just byte 0x2f. Writers emit F cards in this same order. The R card's “filename order” (§6.3) is this order too.</p>
+
+      <h3 id="af-s4-6" data-draft="s4-6"><span class="sec">§4.6</span>Validity predicates</h3>
+      <p>Three predicates check decoded tokens, treated as unsigned bytes.</p>
+      <p><b>Pathnames</b> (§4.6.1) apply to the A card filename and the F card filename and old name. A parser <span class="req">MUST</span> reject a name if and only if it is empty, starts with <code>/</code>, is <code>.</code> or <code>..</code>, starts with <code>./</code> or <code>../</code>, contains <code>//</code>, ends with <code>/</code>, or has a path element that is <code>.</code> or <code>..</code>. Nothing else is checked: backslashes, spaces, control bytes and invalid UTF-8 all pass. A writer creating a new name is held to more. It <span class="req">MUST NOT</span> emit a backslash, and <span class="req">MUST</span> emit valid UTF-8 without overlong forms, characters above U+FFFF, surrogates, private-use characters U+E000–U+F8FF, or the noncharacters U+FDD0–U+FDEF and U+FFFE–U+FFFF. A validator of existing artifacts <span class="req">MUST</span> apply only the parser rules.</p>
+      <p><b>Wiki names</b> (§4.6.2) apply to the L card title and to an A card target that is not a hash. A parser <span class="req">MUST</span> reject a name if and only if its first byte is 0x20 or below, a later byte is below 0x20, it has two spaces in a row, it ends with a space, or it is not 1 to 100 bytes long. Every byte from 0x21 up is otherwise allowed, with no UTF-8 check.</p>
+
+      <h3 id="af-s4-6-3" data-draft="s4-6-3"><span class="sec">§4.6.3</span>Reserved filenames</h3>
+      <p>Some names belong to Fossil's own metadata. A decoded F card filename is reserved when:</p>
+      <ol class="plain">
+        <li>after removing one trailing <code>-wal</code>, <code>-shm</code> or <code>-journal</code>, compared without case,</li>
+        <li>the rest ends, without case, in <code>_FOSSIL_</code> or <code>.fslckout</code>,</li>
+        <li>and that ending is the whole rest, or follows a <code>/</code>, or a suffix was removed in step 1.</li>
+      </ol>
+      <p><code>x_FOSSIL_</code> passes. <code>x_FOSSIL_-wal</code> and <code>dir/.fslckout-journal</code> are reserved. An F card with a reserved name <span class="req">MUST</span> be silently dropped from the file set; the artifact is still accepted. The sort check runs first, so the dropped card must still be in order, and the next F card is compared with the last card kept. In the reference parser the drop happens before the card would make the artifact a manifest. Only the current name is tested, never the old name.</p>
+      <div class="tool wide" data-nosearch id="af-tok">
+        <div class="tool-h"><b>Test a token</b><span>Type it as it appears on the wire, escapes and all</span></div>
+        <div class="field"><label for="af-tok-in">Token</label><input id="af-tok-in" spellcheck="false" value="docs/read\sme.txt"></div>
+        <div class="readout" id="af-tok-dec"></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Rule</th><th>§</th><th>Result</th></tr></thead>
+          <tbody id="af-tok-rows"></tbody>
+        </table></div>
+        <div class="row" id="af-tok-try"></div>
+      </div>
+
+      <h3 id="af-s4-6-4" data-draft="s4-6-4"><span class="sec">§4.6.4</span>Timestamps</h3>
+      <p>D and E card timestamps are single raw tokens, never decoded. A writer emits <code>YYYY-MM-DDTHH:MM:SS</code> with an optional fraction, and for stored artifacts whose time can order repository state a producer <span class="req">MUST</span> use that form. A reader <span class="req">MAY</span> accept more: a date only, a time only (read as a time on 2000-01-01), the words <code>now</code>, <code>subsec</code> and <code>subsecond</code>, or a bare Julian day number greater than 0 and less than 5373484.5. A date-time may carry a timezone. The separator must be uppercase <code>T</code>; lowercase <code>t</code> is rejected.</p>
+      <p>Each field has an exact digit count: a 4-digit year, month 01–12, day 01–31 with no calendar check (2024-02-31 passes), hour 00–24, minute and second 00–59. A date <span class="req">MUST</span> fall strictly after -4713-11-24. The relative words are resolved against the clock when parsed, so two ingestions of the same bytes can store different times. They are admitted for compatibility only.</p>
+
+      <h3 id="af-s4-7" data-draft="s4-7"><span class="sec">§4.7</span>The 21 cards</h3>
+      <p>Every card's grammar is exact (§4.2.1). The table gives each one's tokens; the cards with more to say follow it.</p>
+      <div class="tbl-wrap wide"><table>
+        <thead><tr><th>Card</th><th>Tokens</th><th>What it records</th><th>§</th></tr></thead>
+        <tbody>
+          <tr><td class="num">A</td><td class="num">filename target [source]</td><td>An attachment added to, or removed from, a ticket, technote, forum post or wiki page.</td><td class="num">4.7.2</td></tr>
+          <tr><td class="num">B</td><td class="num">hash</td><td>The baseline. Its presence makes a delta manifest, and a writer <span class="req">MUST</span> name a baseline manifest, not another delta.</td><td class="num">4.7.3</td></tr>
+          <tr><td class="num">C</td><td class="num">comment</td><td>The comment. A C card with no token <span class="req">MUST</span> be rejected.</td><td class="num">4.7.4</td></tr>
+          <tr><td class="num">D</td><td class="num">timestamp</td><td>When the artifact was made.</td><td class="num">4.7.5</td></tr>
+          <tr><td class="num">E</td><td class="num">timestamp id</td><td>The technote's date and identifier.</td><td class="num">4.7.5</td></tr>
+          <tr><td class="num">F</td><td class="num">name [hash [perm [old-name]]]</td><td>One file.</td><td class="num">4.7.6</td></tr>
+          <tr><td class="num">G</td><td class="num">hash</td><td>The forum thread's root post.</td><td class="num">4.7.7</td></tr>
+          <tr><td class="num">H</td><td class="num">title</td><td>A forum thread title, with no content check.</td><td class="num">4.7.7</td></tr>
+          <tr><td class="num">I</td><td class="num">hash</td><td>The forum post being replied to.</td><td class="num">4.7.7</td></tr>
+          <tr><td class="num">J</td><td class="num">field [value]</td><td>A ticket field change. The name is stored verbatim, a leading <code>+</code> included; a missing value is the empty string.</td><td class="num">4.7.8</td></tr>
+          <tr><td class="num">K</td><td class="num">ticket-id</td><td>The ticket, always 40 hex digits whatever the hash policy.</td><td class="num">4.7.9</td></tr>
+          <tr><td class="num">L</td><td class="num">title</td><td>The wiki page name, which must pass §4.6.2.</td><td class="num">4.7.10</td></tr>
+          <tr><td class="num">M</td><td class="num">hash</td><td>One member of a cluster.</td><td class="num">4.7.11</td></tr>
+          <tr><td class="num">N</td><td class="num">mimetype</td><td>The W body's mimetype on wiki, technote and forum artifacts (default <code>text/x-fossil-wiki</code>); the C comment's on an attachment (default <code>text/plain</code>). On a check-in it is legal and ignored.</td><td class="num">4.7.12</td></tr>
+          <tr><td class="num">P</td><td class="num">*hash</td><td>Parents, in order.</td><td class="num">4.7.13</td></tr>
+          <tr><td class="num">Q</td><td class="num">±hash [hash]</td><td>A cherry-pick (<code>+</code>) or backout (<code>-</code>), the sign joined to the hash. The optional second hash is the range's baseline, left null when absent.</td><td class="num">4.7.14</td></tr>
+          <tr><td class="num">R</td><td class="num">md5</td><td>A checksum over the check-in's files. Manifests only, never required.</td><td class="num">4.7.15</td></tr>
+          <tr><td class="num">T</td><td class="num">±*name target [value]</td><td>A tag.</td><td class="num">4.7.16</td></tr>
+          <tr><td class="num">U</td><td class="num">[login]</td><td>The user. An empty or missing login <span class="req">MUST</span> read as <code>anonymous</code>.</td><td class="num">4.7.17</td></tr>
+          <tr><td class="num">W</td><td class="num">size, then body</td><td>A body of exactly <i>size</i> bytes.</td><td class="num">4.7.18</td></tr>
+          <tr><td class="num">Z</td><td class="num">md5</td><td>The checksum of everything above it.</td><td class="num">4.7.19</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3 id="af-s4-7-1" data-draft="s4-7-1"><span class="sec">§4.7.1</span>Hash tokens</h3>
+      <p>Every token that names an artifact <span class="req">MUST</span> be exactly 40 or 64 hexadecimal digits, either case: the A target when it is a hash, the A source, B, the E identifier, the F hash, G, I, M, every P token, both Q tokens once the sign is removed, and the T target unless it is <code>*</code>. The K ticket identifier is the exception at 40 digits only; writers <span class="req">MUST</span> emit it lowercase and parsers <span class="req">MAY</span> accept either case. R and Z hold 32-digit MD5 checksums. None of these is decoded, apart from the A target.</p>
+
+      <h3 id="af-s4-7-2" data-draft="s4-7-2"><span class="sec">§4.7.2</span>A: attachments</h3>
+      <p>An attachment artifact has exactly one A card. Its filename is decoded and <span class="req">MUST</span> pass the pathname predicate; only the last path component is kept. Its target is decoded and <span class="req">MUST</span> look like a hash or a wiki name, though the parser does not check that it names anything. The target is resolved later, when the artifact is crosslinked, in a fixed order: forum post, ticket, wiki page, technote. A target that names nothing known is still recorded, as a generic artifact reference, and is not an error.</p>
+      <p>The source decides the operation. With a source, the attachment is added. Without one, the attachment for that (target, filename) pair is deleted. The operation with the latest time wins.</p>
+
+      <h3 id="af-s4-7-6" data-draft="s4-7-6"><span class="sec">§4.7.6</span>F: files</h3>
+      <p>In a baseline manifest every F card <span class="req">MUST</span> carry a hash. In a delta manifest the hash <span class="req">MAY</span> be left off; the card then marks the file as deleted from the baseline (§8.2).</p>
+      <p>The third token is always the permission and the fourth, when present, the old name of a renamed file. Producers <span class="req">SHOULD</span> emit only <code>w</code>, <code>x</code> or <code>l</code>, and when they write an old name they <span class="req">MUST</span> write a permission before it, normally <code>w</code>. A reader <span class="req">MUST</span> accept any permission token without checking it: one containing <code>x</code> is executable, otherwise one containing <code>l</code> is a symbolic link, and anything else is a regular file.</p>
+
+      <h3 id="af-s4-7-13" data-draft="s4-7-13"><span class="sec">§4.7.13</span>P: parents</h3>
+      <p>Zero or more hashes on one line. An empty P card <span class="req">MUST</span> be accepted, because the initial empty check-in has historically had one; Appendix A.1.1 shows it. On a check-in the first hash is the primary parent and the rest are merge parents. On a wiki page they are prior versions; on a technote, one prior version with the same identifier; on a forum post, one prior version of the post. A producer <span class="req">SHOULD</span> emit at most one P card. The ancestry graph and the branch, leaf and trunk views built from it belong to the Repository State draft.</p>
+
+      <h3 id="af-s4-7-16" data-draft="s4-7-16"><span class="sec">§4.7.16</span>T: tags</h3>
+      <p>The tag name carries its sign: <code>+</code> applies a tag to one artifact, <code>*</code> applies one that propagates to descendants through primary children until blocked, and <code>-</code> cancels or blocks one. The name is decoded, and after the sign it <span class="req">MUST NOT</span> be all hex digits, so it can never be mistaken for a hash prefix. The target is a hash, or <code>*</code> for the artifact carrying the card. A missing value is null, unlike J's empty string.</p>
+      <p>Parsing only checks syntax and order. The effects arrive when the artifact is crosslinked, and are the Repository State draft's business. Canonical artifacts use <code>T *branch * NAME</code> for a branch, <code>T *sym-NAME *</code> for a symbolic tag, and <code>T +closed *</code> and <code>T -closed *</code> to close and reopen a leaf.</p>
+
+      <h3 id="af-s4-7-18" data-draft="s4-7-18"><span class="sec">§4.7.18</span>W: a body counted in bytes</h3>
+      <p>The W card is the one card that spans lines. Its token is a decimal size; the body starts right after that line's LF and is exactly <i>size</i> bytes, which may include LF or any other byte. The byte after the body <span class="req">MUST</span> be LF. A writer <span class="req">MUST</span> emit the size as plain decimal digits. A reader takes the leading digits of the token and ignores the rest, so <code>12x</code> means 12. It <span class="req">MUST</span> detect overflow, <span class="req">MUST</span> check the size against the bytes that remain before reading the body, and <span class="req">MUST NOT</span> scan the body for a card boundary.</p>
+    </section>
+
+    <section class="prose" id="af-s5">
+      <h2 data-draft="s5"><span class="sec">§5</span>Eight kinds of structural artifact</h2>
+      <h3 id="af-s5-1" data-draft="s5-1"><span class="sec">§5.1</span>Types</h3>
+      <p>Every structural artifact is exactly one of eight types, each with a fixed code and the name shown on JSON and API surfaces. Code 0 means “not yet known” and exists only during parsing.</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Code</th><th>Type</th><th>External name</th><th>Records</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td class="num">MANIFEST</td><td class="num">checkin</td><td>a check-in</td></tr>
+          <tr><td class="num">2</td><td class="num">CLUSTER</td><td class="num">cluster</td><td>a list of artifacts</td></tr>
+          <tr><td class="num">3</td><td class="num">CONTROL</td><td class="num">tag</td><td>tag changes</td></tr>
+          <tr><td class="num">4</td><td class="num">WIKI</td><td class="num">wiki</td><td>a wiki page version</td></tr>
+          <tr><td class="num">5</td><td class="num">TICKET</td><td class="num">ticket</td><td>a ticket change</td></tr>
+          <tr><td class="num">6</td><td class="num">ATTACHMENT</td><td class="num">attachment</td><td>an attachment</td></tr>
+          <tr><td class="num">7</td><td class="num">EVENT</td><td class="num">technote</td><td>a technote</td></tr>
+          <tr><td class="num">8</td><td class="num">FORUM</td><td class="num">forumpost</td><td>a forum post</td></tr>
+        </tbody>
+      </table></div>
+      <p>Existing diagnostic messages use a second vocabulary, in which MANIFEST is <code>manifest</code> and FORUM is <code>forum post</code>. The draft warns against mixing the two.</p>
+
+      <h3 id="af-s5-2" data-draft="s5-2"><span class="sec">§5.2</span>Which cards each type allows</h3>
+      <p>An artifact <span class="req">MUST NOT</span> hold a card outside its type's allowed set, and <span class="req">MUST</span> hold every card in its required set. Both checks run once the type is final.</p>
+      <div class="tbl-wrap wide"><table>
+        <thead><tr><th>Type</th><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>G</th><th>H</th><th>I</th><th>J</th><th>K</th><th>L</th><th>M</th><th>N</th><th>P</th><th>Q</th><th>R</th><th>T</th><th>U</th><th>W</th><th>Z</th></tr></thead>
+        <tbody>
+          <tr><td class="num">MANIFEST</td><td></td><td>○</td><td>○</td><td>●</td><td></td><td>○</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td>○</td><td>○</td><td>○</td><td>○</td><td>○</td><td>○</td><td></td><td>●</td></tr>
+          <tr><td class="num">CLUSTER</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td>●</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td>●</td></tr>
+          <tr><td class="num">CONTROL</td><td></td><td></td><td></td><td>●</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td>●</td><td>●</td><td></td><td>●</td></tr>
+          <tr><td class="num">WIKI</td><td></td><td></td><td>○</td><td>●</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td>●</td><td></td><td>○</td><td>○</td><td></td><td></td><td></td><td>●</td><td>●</td><td>●</td></tr>
+          <tr><td class="num">TICKET</td><td></td><td></td><td></td><td>●</td><td></td><td></td><td></td><td></td><td></td><td>●</td><td>●</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td>●</td><td></td><td>●</td></tr>
+          <tr><td class="num">ATTACHMENT</td><td>●</td><td></td><td>○</td><td>●</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td>○</td><td></td><td></td><td></td><td></td><td>○</td><td></td><td>●</td></tr>
+          <tr><td class="num">EVENT</td><td></td><td></td><td>○</td><td>●</td><td>●</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td>○</td><td>○</td><td></td><td></td><td>○</td><td>○</td><td>●</td><td>●</td></tr>
+          <tr><td class="num">FORUM</td><td></td><td></td><td></td><td>●</td><td></td><td></td><td>○</td><td>○</td><td>○</td><td></td><td></td><td></td><td></td><td>○</td><td>○</td><td></td><td></td><td></td><td>●</td><td>●</td><td>●</td></tr>
+        </tbody>
+      </table></div>
+      <p><b>●</b> required, <b>○</b> allowed. A manifest needs only D and Z, so its comment and user are optional. A wiki page without a U card is rejected. Z is required for every type, even though the checksum gate of §4.1 lets an artifact without one through.</p>
+
+      <h3 id="af-s5-3" data-draft="s5-3"><span class="sec">§5.3</span>How the type is decided</h3>
+      <p>Thirteen letters set the type whenever they are read, overwriting any earlier choice:</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Cards</th><th>Set the type to</th></tr></thead>
+        <tbody>
+          <tr><td class="num">A</td><td>ATTACHMENT</td></tr>
+          <tr><td class="num">B F Q R</td><td>MANIFEST</td></tr>
+          <tr><td class="num">E</td><td>EVENT</td></tr>
+          <tr><td class="num">G H I</td><td>FORUM</td></tr>
+          <tr><td class="num">J K</td><td>TICKET</td></tr>
+          <tr><td class="num">L</td><td>WIKI</td></tr>
+          <tr><td class="num">M</td><td>CLUSTER</td></tr>
+        </tbody>
+      </table></div>
+      <p>C, D, N, P, T, U, W and Z never set it. Cards come in letter order, so when several type-setting letters appear, the type <span class="req">MUST</span> be the one set by the alphabetically last. If none appeared, the fallback decides: the artifact is a MANIFEST if it had a C card, any F entry or any P parent, and otherwise a CONTROL artifact. A manifest with only C, D, P, U and Z cards never sets a type, so it reaches the fallback; so does one whose only F card had a reserved name and was dropped before it could set the type. The legality checks of §5.2 then reject any artifact whose cards do not fit the type it ended up with.</p>
+
+      <h3 id="af-s5-4" data-draft="s5-4"><span class="sec">§5.4</span>Four checks per type</h3>
+      <ol class="plain">
+        <li>A CONTROL artifact <span class="req">MUST NOT</span> have a T card whose target is <code>*</code>.</li>
+        <li>In a technote every T card <span class="req">MUST</span> target <code>*</code> and use the <code>+</code> sign.</li>
+        <li>A forum post <span class="req">MUST NOT</span> have both an H card and an I card.</li>
+        <li>A forum post's P card <span class="req">MUST NOT</span> list more than one parent, since forum posts are not merged.</li>
+      </ol>
+      <p>A forum post does not have to be consistent with other artifacts: following its I and P chains need not lead to the post its G card names.</p>
+
+      <h3 id="af-s5-5" data-draft="s5-5"><span class="sec">§5.5</span>A quick pre-filter</h3>
+      <p class="cite">Informative.</p>
+      <p>A fast check may reject any input whose first card letter is N or later before trying a full parse. That is safe because every type's smallest allowed letter is M or earlier (MANIFEST B, CLUSTER M, CONTROL D, WIKI C, TICKET D, ATTACHMENT A, EVENT C, FORUM D), and order puts the smallest letter first.</p>
+
+      <h3 id="af-inspect"><span class="sec">∗</span>Inspect an artifact</h3>
+      <p>The inspector applies the rules of §4 to §6 in the order the draft gives them and stops at the first rejection, as a parser does. Edit the bytes to break a rule. Once this draft's repository is open, its own check-in manifests appear as well. The R card is not part of parsing (§6.3), so the inspector recomputes it separately, from the stored files, under the parse checks.</p>
+      <div class="tool wide" data-nosearch id="af-insp">
+        <div class="tool-h"><b>Artifact inspector</b><span id="af-insp-src"></span></div>
+        <div class="row" id="af-insp-pick"></div>
+        <div class="field"><label for="af-insp-in">Artifact bytes (UTF-8; each line ends in LF)</label><textarea id="af-insp-in" rows="9" spellcheck="false"></textarea></div>
+        <div class="row"><span id="af-insp-status"></span><div class="stats" id="af-insp-stats"></div></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Card</th><th>What it says</th><th>§</th></tr></thead>
+          <tbody id="af-insp-cards"></tbody>
+        </table></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Check, in parse order</th><th>§</th><th>Result</th></tr></thead>
+          <tbody id="af-insp-steps"></tbody>
+        </table></div>
+        <div class="readout" id="af-insp-names"></div>
+        <div class="row">
+          <button class="btn" type="button" id="af-insp-swap">Swap two cards</button>
+          <button class="btn" type="button" id="af-insp-flip">Change one byte</button>
+          <button class="btn" type="button" id="af-insp-reset">Undo edits</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="prose" id="af-s6">
+      <h2 data-draft="s6"><span class="sec">§6</span>Two checksums</h2>
+      <p>Structural artifacts carry two MD5 checksum cards. The Z card covers the artifact's own text. The R card covers the content of every file in a check-in. Both are 32 hexadecimal digits.</p>
+
+      <h3 id="af-s6-1" data-draft="s6-1"><span class="sec">§6.1</span>Token grammar</h3>
+      <p>At parse time both tokens <span class="req">MUST</span> be exactly 32 hex digits, either case. Wherever a value is actually checked, the comparison is byte-exact against a lowercase digest, so in practice only lowercase passes. No artifact bytes are case-folded anywhere in the parse.</p>
+
+      <h3 id="af-s6-2" data-draft="s6-2"><span class="sec">§6.2</span>Z: the artifact checks itself</h3>
+      <p>Let <i>n</i> be the length of the stripped content. A Z card fills its last 35 bytes:</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Offset</th><th>Bytes</th><th>Holds</th></tr></thead>
+        <tbody>
+          <tr><td class="num">0 to n−36</td><td class="num">n−35</td><td>everything above the Z card: the checksummed bytes</td></tr>
+          <tr><td class="num">n−35, n−34</td><td class="num">2</td><td><code>Z</code> and a space</td></tr>
+          <tr><td class="num">n−33 to n−2</td><td class="num">32</td><td>the digest</td></tr>
+          <tr><td class="num">n−1</td><td class="num">1</td><td>the terminating byte, which verification never reads</td></tr>
+        </tbody>
+      </table></div>
+      <p>Verification <span class="req">MUST</span> compute MD5 over the first n−35 bytes, write it as 32 lowercase hex digits, and compare it byte for byte with the stored digest. A present but different Z card <span class="req">MUST</span> cause rejection. A missing one is not this step's concern; §5.2 rejects it. Because the comparison is exact, a digest with an uppercase digit <span class="req">MUST</span> fail even when it is numerically right. Producers <span class="req">MUST</span> emit <code>Z</code>, one space, the lowercase digest and LF. Existing implementations always verify; none can turn the check off.</p>
+      <p>Appendix A.2 works it through for the hero manifest above: the five cards before Z are 27, 22, 2, 35 and 6 bytes, so MD5 runs over bytes 0 to 91 and the Z card sits at bytes 92 to 126.</p>
+
+      <h3 id="af-s6-3" data-draft="s6-3"><span class="sec">§6.3</span>R: the check-in's files</h3>
+      <p>A parser checks only that the R token is 32 hex digits. It <span class="req">MUST NOT</span> be expected to recompute the value, and never does. The value is checked at commit time, against the working checkout, by the writer. An R card appears only in a manifest and is never required.</p>
+
+      <h3 id="af-s6-3-2" data-draft="s6-3-2"><span class="sec">§6.3.2</span>Computing R</h3>
+      <p>One running MD5 is fed every tracked file in filename order, where filename order is the byte order of §4.5.3:</p>
+      <pre class="code wide">ctx = MD5-Init()
+for each tracked file f, in filename order:
+    MD5-Update(ctx, name(f))
+    MD5-Update(ctx, SP || decimal(size-in-bytes(f)) || LF)
+    MD5-Update(ctx, content(f))
+r-value = lowercase-hex(MD5-Final(ctx))</pre>
+      <p>The size is plain decimal with no leading zeros. So the checksum covers names and sizes as well as content. For Appendix A.3's three files the input is these 85 bytes, and its MD5 is the R card <code>95feb799536dc053e7968efb7cdd3ec3</code>:</p>
+      <pre class="code wide">alpha.txt 12↵hello world↵beta.txt 23↵fossil artifact format↵gamma.txt 12↵R card test↵</pre>
+      <p>An empty file set gives the MD5 of nothing, <code>d41d8cd98f00b204e9800998ecf8427e</code>, which is the R card of the root check-in in the hero.</p>
+
+      <h3 id="af-s6-3-3" data-draft="s6-3-3"><span class="sec">§6.3.3</span>R on a delta manifest</h3>
+      <p>For a delta manifest, R <span class="req">MUST</span> be computed over the full file set rebuilt from the delta and its baseline (§8.2), skipping delete markers, and not over the delta's own F cards. The writer emits <code>R</code>, a space, 32 lowercase hex digits and LF, nothing else (§6.3.4). An uppercase R card passes parsing but fails the commit-time check.</p>
+    </section>
+
+    <section class="prose" id="af-s7">
+      <h2 data-draft="s7"><span class="sec">§7</span>Hash policy</h2>
+      <p>Each repository has a hash policy that decides which algorithm names newly stored artifacts, and whether the other algorithm may be consulted. It is local to the repository and only affects names assigned from then on.</p>
+      <h3 id="af-s7-1" data-draft="s7-1"><span class="sec">§7.1</span>Five values</h3>
+      <p>Values <span class="req">MUST</span> match exactly, case and all, and an unknown value is a fatal error.</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Value</th><th>Ordinal</th><th>Names new content with</th><th>May also consult</th></tr></thead>
+        <tbody>
+          <tr><td class="num">sha1</td><td class="num">0</td><td>SHA-1</td><td>SHA3-256</td></tr>
+          <tr><td class="num">auto</td><td class="num">1</td><td>SHA-1</td><td>SHA3-256</td></tr>
+          <tr><td class="num">sha3</td><td class="num">2</td><td>SHA3-256</td><td>SHA-1</td></tr>
+          <tr><td class="num">sha3-only</td><td class="num">3</td><td>SHA3-256</td><td>nothing</td></tr>
+          <tr><td class="num">shun-sha1</td><td class="num">4</td><td>SHA3-256</td><td>nothing</td></tr>
+        </tbody>
+      </table></div>
+      <p>The second algorithm is used to find out whether the same content is already stored under its other name. Under sha3-only and shun-sha1 a request for it <span class="req">MUST</span> fail. Those two policies behave identically for local naming and differ only in what sync admits.</p>
+
+      <h3 id="af-s7-2" data-draft="s7-2"><span class="sec">§7.2</span>The default</h3>
+      <p>A repository with no policy set <span class="req">MUST</span> derive one. If it holds any SHA3 name, or no SHA-1 name at all, which includes an empty repository, the policy is sha3. Only when it holds SHA-1 names and no SHA3 names is it auto. The default is never shun-sha1.</p>
+
+      <h3 id="af-s7-3" data-draft="s7-3"><span class="sec">§7.3</span>Setting it</h3>
+      <p>The policy is one stored configuration value. Nothing stops an operator setting it back to sha1. Asking for auto in a repository that already holds a SHA3 name silently stores sha3 instead, so once a SHA3 name exists, auto cannot be set again.</p>
+
+      <h3 id="af-s7-4" data-draft="s7-4"><span class="sec">§7.4</span>The ratchet</h3>
+      <p>The rule: while the policy is auto, if the name storage is about to assign has 64 digits, the repository <span class="req">MUST</span> switch to sha3 in the same write, before the artifact is looked up, inserted or linked.</p>
+      <p>Under auto, new content is named with SHA-1, so a 64-digit name arrives in only two ways:</p>
+      <ul class="plain">
+        <li>incoming content carries a 64-digit name, or</li>
+        <li>local content's SHA3 hash matches an artifact already stored, and that artifact's 64-digit name is reused.</li>
+      </ul>
+      <p>A name the receiver rejects before storage switches nothing. A name stored before it is checked does switch the policy.</p>
+
+      <h3 id="af-s7-5" data-draft="s7-5"><span class="sec">§7.5</span>One name per content</h3>
+      <p>When content is stored without a supplied name, storage <span class="req">MUST</span> first hash it with the other algorithm, where the policy allows, and look that name up. Only on a miss does it name the content with the primary algorithm. Under sha1, auto and sha3, local writes never give the same bytes two names. Under sha3-only and shun-sha1 the lookup cannot happen, so new content <span class="req">MUST</span> get a SHA3 name even if the same bytes already have a SHA-1 name. Some content is then stored twice, and delta compression keeps the cost down.</p>
+
+      <h3 id="af-s7-6" data-draft="s7-6"><span class="sec">§7.6</span>Names never change</h3>
+      <p>A name is assigned once, when content is first stored. Changing the policy <span class="req">MUST NOT</span> rename or rehash anything already stored.</p>
+
+      <h3 id="af-s7-7" data-draft="s7-7"><span class="sec">§7.7</span>During sync</h3>
+      <p>Peers do not negotiate a policy; each applies its own. The one signal that matters is the peer's announced version: if it predates SHA3 support, a sender refuses to send any artifact with a 64-digit name, with an explicit error. It never converts or silently skips it. What shun-sha1 does to incoming SHA-1 artifacts is defined by the Sync Protocol.</p>
+    </section>
+
+    <section class="prose" id="af-s8">
+      <h2 data-draft="s8"><span class="sec">§8</span>Rebuilding a delta manifest</h2>
+      <p>A manifest with a B card is a delta manifest; one without is a baseline manifest. Nothing else decides it, not file count, not an R card. A delta manifest lists only what changed since its baseline, and anything that needs the full file set <span class="req">MUST</span> merge the two. A delta manifest is a different thing from the Delta Format, which encodes an artifact's bytes one layer below. This merge works on cards.</p>
+      <p>Appendix A.4 has a baseline with three files and a delta that modifies one, deletes one and adds one:</p>
+      <!--FIG:af-merge-->
+
+      <h3 id="af-s8-1" data-draft="s8-1"><span class="sec">§8.1</span>What the merge needs</h3>
+      <p>Both lists sorted by decoded filename. A conforming parser already guarantees that (§4.5.2). A <b>delete marker</b> is an F card with no hash, allowed only in a delta manifest.</p>
+
+      <h3 id="af-s8-2" data-draft="s8-2"><span class="sec">§8.2</span>The merge walk</h3>
+      <p>An implementation <span class="req">MUST</span> walk both lists at once in filename order, comparing decoded names byte by byte. At each step:</p>
+      <ol class="plain">
+        <li>Same name, and the delta entry has a hash: emit the delta entry. Both lists advance.</li>
+        <li>Same name, and the delta entry has no hash: the file is deleted. Both advance and nothing is emitted.</li>
+        <li>Different names: emit whichever sorts first and advance only its list. A delete marker for a name the baseline lacks is emitted here too, but it adds no file. It is not an error.</li>
+      </ol>
+      <p>The walk ends when both lists are used up. When one ends first, the rest of the other is emitted as it stands, delete markers included. So anything computed from the result <span class="req">MUST</span> skip entries with no hash, as the R card computation does.</p>
+
+      <h3 id="af-s8-3" data-draft="s8-3"><span class="sec">§8.3</span>Finding the baseline</h3>
+      <p>The baseline is loaded the first time it is needed. If it is missing or is not a manifest, file enumeration and single-name lookup <span class="req">MUST</span> treat that as fatal. Consumers that can wait, such as a parent-to-child file diff or post-parse relationship processing, <span class="req">MAY</span> instead record the gap, keyed by the dependent artifact and the missing hash, and retry when the baseline arrives. Each step of an enumeration reports no error for a missing baseline; it quietly lists the delta alone. So implementations <span class="req">MUST</span> resolve the baseline before they start.</p>
+
+      <h3 id="af-s8-4" data-draft="s8-4"><span class="sec">§8.4</span>Looking up one name</h3>
+      <p>To find one file in a delta manifest, an implementation <span class="req">MUST</span> search the delta's own F cards first, with closest-name matching turned off. A delete marker for the name means not found, without asking the baseline. Only a name the delta does not mention at all sends the lookup to the baseline.</p>
+
+      <h3 id="af-s8-5" data-draft="s8-5"><span class="sec">§8.5</span>A view that does not merge</h3>
+      <p class="cite">Informative.</p>
+      <p>The JSON rendering of a manifest lists its own F cards, so for a delta manifest it shows only the changes. This is deliberate, and that view is the one exception.</p>
+    </section>
+
+    <section class="prose" id="af-s9">
+      <h2 data-draft="s9"><span class="sec">§9</span>Security considerations</h2>
+      <ul class="plain">
+        <li>A name binds content only as strongly as its hash. SHA-1 has known collision attacks; SHA3-256 does not, and is the default for new artifacts in most repository states. Existing implementations compute SHA-1 with collision detection, and shun-sha1 lets a repository refuse SHA-1 artifacts arriving by sync.</li>
+        <li>MD5 is not collision-resistant. The Z and R cards catch accidental corruption. Protection against a crafted artifact comes from its name.</li>
+        <li>Name, Z checksum and signature each cover a different byte range (§4.1.1), and implementations <span class="req">MUST</span> keep them apart. A wrapper says how the bytes are laid out, nothing more. It is not evidence that a signature was checked or that the signer is trusted; the draft leaves signature checking out of scope.</li>
+        <li>A receiver that admits content as verified under a supplied name without checking it breaks the integrity of everything downstream. Content stored under an unchecked name <span class="req">MUST NOT</span> be treated as verified.</li>
+        <li>Name and digest comparisons are exact lowercase. Accepting a token at validation <span class="req">MUST NOT</span> be taken as evidence of integrity.</li>
+        <li>The reserved-name drop changes the file set without failing the parse. Two readers disagree about such a manifest only if one skips the drop.</li>
+        <li>The W body is found by count. A reader <span class="req">MUST</span> bound the size against what remains, reject overflow, never scan the body, and never read past the end of the buffer.</li>
+        <li>An earlier Z line is just content. Tools that scan text for a Z card can be fooled; verification <span class="req">MUST</span> use the byte position of §6.2.</li>
+        <li>Rebuilding a delta manifest or verifying an artifact needs the artifacts it refers to. Until they arrive the reference stays unresolved, and the Sync Protocol says how to ask for them.</li>
+      </ul>
+    </section>
+
+    <section class="prose" id="af-sA">
+      <h2 data-draft="sA"><span class="sec">App. A</span>Worked examples</h2>
+      <p>Each example in the appendix is complete: its name, checksums and byte counts recompute from the bytes shown. Long lines are folded with the single-backslash method of RFC 8792, and no real line ends in a backslash, so unfolding is unambiguous. All of them load into the inspector above, which recomputes their names, their Z cards, and their R cards where the draft gives the file contents.</p>
+      <div class="tbl-wrap wide"><table>
+        <thead><tr><th>§</th><th>Artifact</th><th>Bytes</th><th>Shows</th></tr></thead>
+        <tbody>
+          <tr><td class="num">A.1.1</td><td>Root check-in, SHA-1 name <code>a28c8364…</code></td><td class="num">127</td><td>An empty P card; R as the MD5 of no files.</td></tr>
+          <tr><td class="num">A.1.2</td><td>Technote, SHA3-256 name <code>2fa494a1…</code></td><td class="num">655</td><td>An N card after P, allowed because E came first; a 415-byte W body with blank lines.</td></tr>
+          <tr><td class="num">A.2</td><td>The A.1.1 manifest again</td><td class="num">92 + 35</td><td>Z as the MD5 of everything before it.</td></tr>
+          <tr><td class="num">A.3</td><td>A check-in with three files</td><td class="num">425</td><td>R over an 85-byte input of names, sizes and contents.</td></tr>
+          <tr><td class="num">A.4</td><td>A baseline and a delta</td><td class="num">429, 446</td><td>The merge of §8 and R over the rebuilt set: a 98-byte input.</td></tr>
+        </tbody>
+      </table></div>
+      <p>In A.4.3 the four outcomes of the merge are named <b>add</b>, <b>modify</b>, <b>delete</b> and <b>carry forward</b>. The rebuilt set is <code>file-a.txt</code> with new content, <code>file-b.txt</code> unchanged and the new <code>file-d.txt</code>, and the delta's R card <code>0d7675864b46dd3f197e988759ac2dfa</code> is computed over those three.</p>
+    </section>
+
+    <section class="prose" id="af-sB">
+      <h2 data-draft="sB"><span class="sec">App. B</span>Collected grammar</h2>
+      <p>ABNF per RFC 5234, writer syntax only. Order, repetition, per-type legality, the predicates, the checksums and what readers tolerate are all in the body. The W body is located by count, which ABNF cannot express.</p>
+      <pre class="code wide" data-abnf>artifact    = 1*card                ; final byte of the artifact is LF
+card        = a-card / b-card / c-card / d-card / e-card /
+              f-card / g-card / h-card / i-card / j-card /
+              k-card / l-card / m-card / n-card / p-card /
+              q-card / r-card / t-card / u-card / w-card / z-card
+
+a-card      = %x41 SP filename SP target [ SP hash ] LF
+target      = hash / wikiname
+b-card      = %x42 SP hash LF
+c-card      = %x43 SP comment LF
+d-card      = %x44 SP timestamp LF
+e-card      = %x45 SP timestamp SP hash LF
+f-card      = %x46 SP filename [ SP hash [ SP perm [ SP old-name ] ] ] LF
+g-card      = %x47 SP hash LF
+h-card      = %x48 SP token LF
+i-card      = %x49 SP hash LF
+j-card      = %x4A SP token [ SP token ] LF
+k-card      = %x4B SP 40hexdig-ci LF
+l-card      = %x4C SP wikiname LF
+m-card      = %x4D SP hash LF
+n-card      = %x4E SP token LF
+p-card      = %x50 *( SP hash ) LF
+q-card      = %x51 SP q-sign hash [ SP hash ] LF
+q-sign      = "+" / "-"
+r-card      = %x52 SP md5-token LF
+t-card      = %x54 SP tag-sign token SP ( hash / "*" ) [ SP token ] LF
+tag-sign    = "+" / "-" / "*"
+u-card      = %x55 [ SP [ token ] ] LF
+w-card      = %x57 SP size LF body LF
+size        = "0" / ( nonzero-digit *DIGIT )
+nonzero-digit = %x31-39
+body        = *OCTET                ; exactly &lt;size&gt; octets; MAY contain LF
+z-card      = %x5A SP md5-token LF
+
+token       = 1*tchar
+tchar       = %x00-09 / %x0B-1F / %x21-FF
+comment     = token                 ; escape-decoded
+filename    = token                 ; escape-decoded; pathname predicate
+old-name    = token                 ; escape-decoded; pathname predicate
+perm        = token                 ; old-name requires perm; SHOULD be w/x/l
+wikiname    = token                 ; escape-decoded; wiki-name predicate
+
+hash        = 40hexdig-ci / 64hexdig-ci
+md5-token   = 32hexdig-ci
+hexdig-ci   = DIGIT / %x41-46 / %x61-66
+lhexdig     = DIGIT / %x61-66
+
+timestamp   = date %x54 time [ frac ]    ; writer form
+date        = 4DIGIT "-" 2DIGIT "-" 2DIGIT
+time        = 2DIGIT ":" 2DIGIT ":" 2DIGIT
+frac        = "." 1*DIGIT
+
+artifact-name = sha1-name / sha3-name    ; writer form
+sha1-name     = 40lhexdig
+sha3-name     = 64lhexdig
+accepted-name = 40hexdig-ci / 64hexdig-ci
+
+SP = %x20    LF = %x0A    DIGIT = %x30-39    OCTET = %x00-FF</pre>
+    </section>
+
+    <section class="prose" id="af-sC">
+      <h2 data-draft="sC"><span class="sec">App. C</span>Where older documentation differs</h2>
+      <p>These statements in Fossil's documentation, or in text that comes with existing implementations, do not match the body of the draft. The body is definitive.</p>
+      <div class="tbl-wrap wide"><table>
+        <thead><tr><th>Older text says</th><th>The draft says</th></tr></thead>
+        <tbody>
+          <tr><td>A manifest requires C, D, U and Z.</td><td>It requires only D and Z; C and U are optional, for historical artifacts (§5.2).</td></tr>
+          <tr><td>Every type except a manifest needs a Z card.</td><td>Every type needs one, manifests included (§5.2).</td></tr>
+          <tr><td>A wiki artifact with no U card counts as user <code>nobody</code>.</td><td>It is rejected. A U card with an empty login reads as <code>anonymous</code> (§4.7.17).</td></tr>
+          <tr><td>A forum post whose G card does not match the root reached through its I and P chains is invalid.</td><td>No parser enforces that, and the draft does not require it (§5.4).</td></tr>
+          <tr><td>The timestamp separator is a lowercase <code>t</code>.</td><td>Only uppercase <code>T</code> is accepted (§4.6.4).</td></tr>
+          <tr><td>Only PGP clearsign wrappers exist.</td><td>SSH signed wrappers are removed too (§4.1.1).</td></tr>
+          <tr><td>The J card's field name and value are both escaped.</td><td>Only the value is decoded. Implementations differ here (§4.7.8).</td></tr>
+          <tr><td>(Implementations) One does not decode the N mimetype; one decodes the J field name.</td><td>The decode map of §4.3.1 is the rule.</td></tr>
+          <tr><td>(Parsers) An N card is accepted right after P once an E card has made the artifact a technote.</td><td>That exception is part of the ordering rule. Every other out-of-order card is rejected (§4.4).</td></tr>
+          <tr><td>(Implementations) One accepts any F permission token, one only <code>w</code>, <code>x</code> or <code>l</code>.</td><td>Readers accept any token in third place; producers <span class="req">SHOULD</span> write <code>w</code>, <code>x</code> or <code>l</code> (§4.7.6).</td></tr>
+          <tr><td>(Implementations) One joins repeated P cards, one rejects a second.</td><td>Producers <span class="req">SHOULD</span> emit one; receivers are not constrained further (§4.7.13).</td></tr>
+          <tr><td>The F card description does not mention reserved names.</td><td>They are silently dropped, which changes some historical file sets (§4.6.3).</td></tr>
+          <tr><td>New repositories default to shun-sha1.</td><td>The default is never shun-sha1; an empty repository gets sha3 (§7.2).</td></tr>
+        </tbody>
+      </table></div>
+    </section>

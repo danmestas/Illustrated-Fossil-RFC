@@ -1,0 +1,25 @@
+margin = 0.15in
+boxht = 0.5
+boxwid = 1.1
+
+# Source, cut into 16-byte blocks.
+BLOCK_0: box "block 0" bold "bytes 0–15" small
+BLOCK_1: box "block 1" bold "bytes 16–31" small
+BLOCK_2: box "block 2" bold "bytes 32–47" small fill 0x0C0003
+BLOCK_3: box "block 3" bold "bytes 48–63" small
+BLOCK_4: box "…" bold
+
+# Target on the same axis: the copy is centred under block 2.
+COPY: box "" wid 2.3 with .n at BLOCK_2.s + (0, -0.7)
+WINDOW: box "window" bold "16 bytes" small wid 1.1 ht 0.36 fill 0x0C0003 dashed at COPY
+LITERAL: box "literal" bold "skipped bytes" small wid 1.1 with .e at COPY.w
+UNREAD: box "unread" bold "rest of target" small wid 1.1 with .w at COPY.e
+
+text "source" small rjust at BLOCK_0.w - (0.12, 0)
+text "target" small rjust at LITERAL.w - (0.12, 0)
+
+arrow from BLOCK_2.s to WINDOW.n
+text "same hash, same bytes" small ljust at (BLOCK_2.x + 0.12, (BLOCK_2.s.y + WINDOW.n.y) / 2)
+arrow from WINDOW.w to COPY.w
+arrow from WINDOW.e to COPY.e
+text "copy: the match, extended both ways" small at (COPY.x, COPY.s.y - 0.22)

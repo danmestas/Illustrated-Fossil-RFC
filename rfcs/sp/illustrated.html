@@ -1,0 +1,525 @@
+    <header class="hero">
+      <div class="eyebrow">draft-fossil-sync-protocol-00 · an illustrated reading</div>
+      <h1>The Fossil Sync Protocol</h1>
+      <p class="lede">Every Fossil repository is a set of hash-named artifacts that only grows. Sync gives each side what the other lacks, over ordinary HTTP POSTs, until neither has anything left to ask for. Each message is a list of short text lines called cards. This reading follows the draft section by section and replays a real clone of its own repository, one round at a time.</p>
+    </header>
+
+    <section class="prose" id="sp-s1">
+      <h2 data-draft="s1"><span class="sec">§1</span>What sync does</h2>
+      <p>A repository holds artifacts named by their hash, and the set only ever grows. Two repositories sync by exchanging the difference between their sets, so both end up with the union. It does not matter which side starts or when, because a union of grow-only sets comes out the same in any order (§1, citing the G-Set literature).</p>
+      <p>A repository can know an artifact's hash without having its content. The draft calls such a hash a <b>phantom</b>. Sync works in rounds: each round announces artifacts, turns unknown hashes into phantoms, asks for phantoms, carries content, and goes again while §3.7 says there is still work to do.</p>
+      <p>The client drives everything. It sends an HTTP request, reads the reply and decides whether to send another. The server keeps no state between requests (§1).</p>
+      <p>To see the rounds play out, <a href="#r-sync">watch a sync</a>: a real pull or push between two copies of this draft's repository, animated message by message.</p>
+      <p>The draft covers transport, login, artifact and unversioned-file transfer, clone, configuration framing and termination. It leaves out how rows of the <code>/user</code>, <code>/reportfmt</code>, <code>/shun</code>, <code>/concealed</code> and <code>/subscriber</code> table groups are serialised, and implementations <span class="req">MAY</span> omit those groups. Leaving out the <code>/shun</code> group does not remove the repository's local shun set, which still filters requests and admission (§1, §3.3, §7.7). Sections 3 to 11 are normative.</p>
+    </section>
+
+    <section class="prose" id="sp-s2">
+      <h2 data-draft="s2"><span class="sec">§2</span>Words the draft uses</h2>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td>Phantom</td><td>A known artifact hash whose content is absent. §3.3 governs it.</td></tr>
+          <tr><td>Card</td><td>An LF-terminated operator line, optionally followed by a byte-counted payload.</td></tr>
+          <tr><td>Round</td><td>One request and its reply. The round ends when the body runs out, with no terminal card.</td></tr>
+          <tr><td>Servercode, projectcode</td><td>The servercode identifies one repository instance and is informational. The projectcode is shared by every copy of the project. A push or pull with a different projectcode <span class="req">MUST</span> be refused.</td></tr>
+          <tr><td>igot, gimme</td><td>“I have this artifact” and “send me this artifact”.</td></tr>
+          <tr><td>Release integer</td><td>MAJOR × 10000 + MINOR × 100 + PATCH, so Fossil 2.0 is 20000. It is separate from the clone version.</td></tr>
+          <tr><td>Clone protocol version</td><td>The VERSION on a clone card, which selects the transfer encoding. Version 3 uses <code>cfile</code>.</td></tr>
+          <tr><td>Unversioned file</td><td>Repository-local state outside the artifact set, synced with its own cards. Unversioned files are not artifacts and ignore the artifact hash policy and tag rules.</td></tr>
+          <tr><td>Fossilize</td><td>The escaping scheme from the Artifact Format, §4: <code>\s</code> for a space, <code>\n</code> for a line feed, and so on.</td></tr>
+        </tbody>
+      </table></div>
+      <p>Branches, tags, leaves and the current trunk are views computed after artifacts are parsed. Sync carries only the artifacts they come from (§2). The draft uses <span class="req">MUST</span>, <span class="req">SHOULD</span> and <span class="req">MAY</span> in the BCP 14 sense, and only when capitalised.</p>
+    </section>
+
+    <section class="prose" id="sp-s3">
+      <h2 data-draft="s3"><span class="sec">§3</span>The sync loop</h2>
+      <p>The client sends one HTTP request body full of cards. The server handles that body on its own and returns one reply body of cards. The client reads the reply and uses it to build the next request, if there is one. No card says “done”. A round ends when its body is used up, and the session ends when §3.7 finds no reason for another round. The loop has four parts (§3):</p>
+      <ol class="plain">
+        <li><b>Build the request.</b> Start with login, version and the chosen operation, add remembered state such as the cookie, add the cards the last reply called for, and end with random bytes.</li>
+        <li><b>Exchange cards.</b> <code>igot</code> announces artifacts, <code>gimme</code> asks for missing ones, <code>file</code> and <code>cfile</code> carry content. The unversioned-file cards run the same announce, ask and send cycle for unversioned files.</li>
+        <li><b>Repair phantoms.</b> A side that learns a hash without its content records a phantom, and later rounds ask for eligible phantoms.</li>
+        <li><b>Decide whether to continue.</b> After reading the reply, the client counts the round and applies §3.7. New work drives another round. The server never acknowledges anything.</li>
+      </ol>
+
+      <h3 data-draft="s3-1"><span class="sec">§3.1</span>What a round carries</h3>
+      <p>Every request <span class="req">MUST</span> contain <code>pragma client-version</code>, and it <span class="req">MUST</span> come before any card that asks for content, so the server can apply the SHA3 gate (§7.6) when it handles them. A body login comes before it. So does <code>pragma send-private</code> in the first round of a private sync, though later rounds put it after. The first round of a clone sends no login of either kind.</p>
+      <p>Push, pull and sync requests repeat <code>push</code>, <code>pull</code> or both in every round. A clone starts with <code>clone 3 1</code>. A request <span class="req">MAY</span> also carry <code>gimme</code>, content, <code>igot</code>, configuration and unversioned cards, and the returned cookie, and it <span class="req">MUST</span> end with a random comment. A normal reply ends with a <code>#&nbsp;timestamp</code> comment. Replies cut short before or during dispatch can leave that comment out.</p>
+
+      <h3 data-draft="s3-1-1"><span class="sec">§3.1.1</span>How the client reads a reply</h3>
+      <p>After undoing the transport encoding, the client takes the reply's cards in order:</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Card</th><th>What the client does</th></tr></thead>
+        <tbody>
+          <tr><td><code>push</code>, <code>pull</code></td><td>Records the peer's servercode and projectcode. Its own operation stays the same.</td></tr>
+          <tr><td><code>igot</code></td><td>Applies the phantom rules of §3.3.</td></tr>
+          <tr><td><code>file</code>, <code>cfile</code></td><td>Stores content per §7. Sets content-received only if content was stored or a dangling delta created a source phantom.</td></tr>
+          <tr><td><code>gimme</code></td><td>Notes that the peer lacks the artifact. If push is still on, the client holds the content and policy allows, it appends the content to the next request.</td></tr>
+          <tr><td><code>uvigot</code>, <code>uvfile</code></td><td>Runs the unversioned-file state machine (§8.5.1, §7.3). A <code>uvgimme</code> in a reply is the wrong direction (§5.2).</td></tr>
+          <tr><td><code>clone_seqno N</code></td><td>Records N if it is decimal and otherwise keeps the old value.</td></tr>
+          <tr><td><code>error</code>, <code>cookie</code>, <code>#…</code></td><td>Applies §10.1, replaces the stored cookie, or applies the comment rules of §5.3.</td></tr>
+        </tbody>
+      </table></div>
+      <p>When the loop over cards ends, the client counts the round, evaluates §3.7, and only then throws away the state it kept for that round.</p>
+
+      <h3 data-draft="s3-2"><span class="sec">§3.2</span>What each side remembers</h3>
+      <p>Table 1 of the draft lists the client's state by how long it lasts. The project code, the phantom set and the cookie persist in the repository. The peer's version and date, the clone sequence number, the round number and the unversioned send table last for the session. Some flags live for one round only: whether an <code>igot</code> created a phantom, whether content arrived, which hashes the peer has or lacks, and the unversioned and private counters. Round state is reset when a round starts and kept until §3.7 has been evaluated. The server keeps its repository plus a few things scoped to one request, such as whether it already sent the unversioned catalog.</p>
+      <p>Cards for the next request are collected while the reply is still being read. The file and delta counts that §3.7(b) checks are the content cards collected in that window (§3.2).</p>
+
+      <h3 data-draft="s3-2-1"><span class="sec">§3.2.1</span>The order of cards in a message</h3>
+      <pre class="code wide">login USER NONCE SIGNATURE     when named login applies; never in the first clone round
+pragma send-private            first private round; later rounds put it after client-version
+pragma client-version …        every request, before any card that asks for content
+push / pull, or clone 3 NEXT   fixed operation; clone reissue is appended while reading the reply
+cookie TEXT                    later rounds, straight after the operation
+gimme, file, config, uv cards  as applicable
+igot                           as applicable; never during clone
+# random                       every request, last</pre>
+      <p>A reply opens with <code>pragma server-version</code> where it applies, then any <code>push</code>, <code>pull</code>, <code>igot</code>, content, <code>gimme</code> and unversioned cards. A clone reply carries its <code>cfile</code> cards, then <code>clone_seqno NEXT</code>, then <code>push</code>. An ordinary reply ends with the <code>#&nbsp;timestamp</code> comment (Table 3).</p>
+      <p>When cookie login is in use (§6.5), the login travels in the HTTP <code>Cookie:</code> header and the body has no login card. A clone that the server refuses for lack of Clone permission gets a <code>push</code> card and then an <code>error</code>, with no <code>cfile</code> or <code>clone_seqno</code> (Table 3).</p>
+
+      <h3 id="sp-replay"><span class="sec">∗</span>Replay an exchange</h3>
+      <p>Pick an example from Appendix A to step through it a round at a time. Each card is shown next to the section that defines it. Long hashes are shortened, and payloads are summarised by size. Once this page's repository has loaded, <i>Run a real clone</i> clones it into an empty repository in memory and replays the rounds that clone actually exchanged.</p>
+      <div class="tool wide" data-nosearch id="sp-replay-tool">
+        <div class="tool-h"><b>Round by round</b><span id="sp-rp-source"></span></div>
+        <div class="row" id="sp-rp-pick">
+          <button class="btn" type="button" data-ex="a1">§A.1 push and pull</button>
+          <button class="btn" type="button" data-ex="a2">§A.2 clone, SHA3 gate</button>
+          <button class="btn" type="button" data-ex="a3">§A.3 private pull</button>
+          <button class="btn primary" type="button" id="sp-rp-live" disabled>Run a real clone</button>
+        </div>
+        <div class="row">
+          <button class="btn" type="button" id="sp-rp-prev">Previous round</button>
+          <button class="btn" type="button" id="sp-rp-next">Next round</button>
+          <div class="stats" id="sp-rp-stats"></div>
+        </div>
+        <div class="tool-h"><b id="sp-rp-req-h">Request</b><span>client to server</span></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Card</th><th>§</th><th>Meaning</th></tr></thead>
+          <tbody id="sp-rp-req"></tbody>
+        </table></div>
+        <div class="tool-h"><b id="sp-rp-rep-h">Reply</b><span>server to client</span></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Card</th><th>§</th><th>Meaning</th></tr></thead>
+          <tbody id="sp-rp-rep"></tbody>
+        </table></div>
+        <div class="callout" id="sp-rp-note"></div>
+      </div>
+
+      <h3 data-draft="s3-3"><span class="sec">§3.3</span>How phantoms are born and die</h3>
+      <p>An <code>igot HASH</code> creates a phantom only if the receiver lacks HASH and can get it in the current direction: pull, clone, or receiving a push. A delta whose source the receiver lacks creates a phantom for that source.</p>
+      <p>In each round the client tracks which hashes the peer has announced or sent and which it has asked for. New phantoms can be requested at once. The scan for phantoms to request skips hashes the peer lacks, hashes in the shun table, and private hashes unless private sync is on. A <code>shun-sha1</code> policy does not by itself suppress a <code>gimme</code>.</p>
+      <p>On <code>gimme HASH</code>, a side that holds the content sends it now or in a later message, if the direction and policy allow. If the direction forbids sending, it sends nothing and no error, and does not defer. If it lacks the content, it skips the request silently.</p>
+      <p>Storing the content deletes the phantom. A delta whose source is missing is kept under its own HASH, its phantom is deleted, a phantom is created for the source, and content-received is set. HASH is not requested again. The target can be rebuilt once its source chain arrives (§3.3, §7.4).</p>
+
+      <h3 data-draft="s3-4"><span class="sec">§3.4</span>Clone uses the same loop</h3>
+      <p>A modern clone runs the ordinary loop and §3.7, sending <code>clone 3 SEQNO</code> while it transfers and requests with no operation card after the sequence reaches zero. §8.1 to §8.4 hold the rules.</p>
+
+      <h3 data-draft="s3-5"><span class="sec">§3.5</span>Pragmas</h3>
+      <p>Pragmas are ordinary cards that keep their place in the body. Unknown pragma names <span class="req">MUST</span> be ignored. §9 defines the known ones.</p>
+
+      <h3 data-draft="s3-6"><span class="sec">§3.6</span>The cookie card</h3>
+      <p>A server <span class="req">MAY</span> send <code>cookie TEXT</code>. The client <span class="req">MUST</span> replace its stored value with it and <span class="req">MAY</span> send it back later. Servers <span class="req">MUST NOT</span> depend on it and <span class="req">MUST</span> tolerate cookies they did not issue and more than one cookie. Clients need not return one. This card is part of the body and is separate from HTTP cookie login (§4.3, §6.5).</p>
+
+      <h3 data-draft="s3-7"><span class="sec">§3.7</span>When to stop</h3>
+      <p>After reading a reply and counting the round, the client <span class="req">MUST</span> send another round if and only if one of these holds:</p>
+      <div class="tbl-wrap wide"><table>
+        <thead><tr><th>Limb</th><th>Another round when</th></tr></thead>
+        <tbody>
+          <tr><td>(a)</td><td>A <code>file</code> or <code>cfile</code> stored content (a dangling delta counts), or an <code>igot</code> created a phantom, and the phantom table is still not empty. This applies to every operation.</td></tr>
+          <tr><td>(b)</td><td>While reading this reply, the client appended at least one full or delta content card to the next request, or the unversioned upload phase is selected.</td></tr>
+          <tr><td>(c)</td><td>This request sent a private <code>igot HASH 1</code> and the round number is now exactly 1, or the reply's <code>server-version</code> made private inventory eligible and the client appended at least one such <code>igot</code>.</td></tr>
+          <tr><td>(d)</td><td>This request sent a <code>uvgimme</code> and either the reply carried a <code>uvfile</code> or the round number is now below 3, or reading this reply appended a <code>uvgimme</code>.</td></tr>
+          <tr><td>(e)</td><td>The operation is a modern clone, none of (a) to (d) fired, and this was the first clone round, or content was stored this round, or the sequence is still positive and the count of received artifact cards went up.</td></tr>
+        </tbody>
+      </table></div>
+      <p>A positive clone sequence on its own does not keep a stalled session going. Remaining phantoms on their own <span class="req">MUST NOT</span> cause another round or an error. If nothing holds, the client stops, and the server sends no completion card. If a round is needed but clone reissue is barred, the client sends the cleanup request of §8.2.</p>
+
+      <h3 data-draft="s3-8"><span class="sec">§3.8</span>The client as a state machine</h3>
+      <p>The draft restates the loop as five named states, in the style TCP uses. Where the state machine and a controlling section differ, the section wins. The round counter starts at zero just before the first request and goes up only after a reply has been read.</p>
+      <!--FIG:sp-states-->
+      <p>A first clone round sends no login and no configuration or unversioned hash, and it ignores any error in the reply. It always moves to EXCHANGE, which forces a second clone round. In EXCHANGE, an unknown or malformed reply card logs a local warning and ends only that reply's card loop. What was already parsed stays in effect, and §3.7 is evaluated as usual (§3.8, Table 5).</p>
+
+      <h3 data-draft="s3-9"><span class="sec">§3.9</span>A narrow tolerance</h3>
+      <p>Receivers tolerate only the cases the draft names: unknown pragmas, extra tokens on a few cards, one byte after a config payload, other whitespace between tokens, foreign cookies, errors in the first clone reply, and tokens beyond the sixth. The draft deliberately rejects the TCP habit of liberal acceptance, on the grounds that guessing at malformed input lets implementations drift apart. Fossil's tokenizer exposes at most six tokens per line, so senders <span class="req">MUST NOT</span> emit a seventh, and receivers ignore any they find.</p>
+    </section>
+
+    <section class="prose" id="sp-s4">
+      <h2 data-draft="s4"><span class="sec">§4</span>Transport</h2>
+      <p>Sync is an HTTP POST to the repository URL, unchanged, with an empty path sent as <code>/</code>. Fossil's own client sends <code>HTTP/1.0</code>. Clients <span class="req">MUST NOT</span> append <code>/xfer</code>. A request typed <code>application/x-fossil</code> or <code>application/x-fossil-debug</code> reaches sync whatever its path, and a request that is not a POST is redirected to the home page. Every request <span class="req">MUST</span> carry an exact <code>Content-Length</code> and has a non-empty body. A reply <span class="req">MAY</span> omit it, and Fossil then reads to end of file. Fossil ignores <code>Transfer-Encoding</code>. Over SSH the request adds <code>X-Fossil-Transport: SSH</code>.</p>
+      <ul class="plain">
+        <li><b>Redirects.</b> Follow at most 19 redirects with status 301, 302, 307 or 308; the twentieth is fatal. Never go from HTTPS to HTTP, and never redirect SSH or local-file transports. Strip any trailing <code>/xfer</code> from the target and change nothing else in the path. The client resends the same card body with fresh compression, headers and login for the new target. It does not reset peer state or choose cards again.</li>
+        <li><b>Status.</b> Only HTTP 200 counts as a protocol reply. Any other status aborts before card parsing.</li>
+        <li><b>Content type of the reply.</b> A missing type means compressed <code>application/x-fossil</code>. A value is matched case-insensitively by prefix: <code>application/x-fossil-debug</code> or <code>-uncompressed</code> selects the uncompressed body, any other <code>application/x-fossil</code> prefix selects compressed, and any other value is rejected. On the server, only the exact type <code>application/x-fossil</code> selects decompression of the request body.</li>
+      </ul>
+
+      <h3 data-draft="s4-1"><span class="sec">§4.1</span>Compression and media types</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Media type</th><th>Body</th><th>Used for</th></tr></thead>
+        <tbody>
+          <tr><td><code>application/x-fossil</code></td><td>Compressed container</td><td>All production requests and ordinary replies.</td></tr>
+          <tr><td><code>application/x-fossil-debug</code></td><td>Plain cards</td><td>Diagnostics only. It <span class="req">MUST NOT</span> be used in production.</td></tr>
+          <tr><td><code>application/x-fossil-uncompressed</code></td><td>Plain cards</td><td>Clone version 3 replies. The <code>cfile</code> payloads inside are already compressed.</td></tr>
+        </tbody>
+      </table></div>
+      <p>The compressed container is a 4-byte big-endian count of the uncompressed length, followed by a zlib stream: a 2-byte header, a DEFLATE body and a 4-byte Adler-32. It is neither raw DEFLATE nor gzip.</p>
+      <!--FIG:sp-container-->
+      <p>The sender <span class="req">MUST</span> write the real input length, but the receiver treats it as a capacity. After a good decode the receiver uses the bytes it actually got and <span class="req">MUST NOT</span> reject a body for being shorter. Bytes after the zlib stream are ignored. If the zlib data is malformed, Fossil keeps the original bytes and the sync path parses them as cards anyway. Ordinary compression uses zlib's default level, an inline body login uses level 9, and receivers <span class="req">MUST</span> handle any level. Stored blobs use the same container and are retransmitted byte for byte.</p>
+
+      <h3 data-draft="s4-2"><span class="sec">§4.2</span>A round is one POST</h3>
+      <p>A round is one POST and its reply, and it ends when the reply body runs out. There is no <code>done</code> or <code>end</code> card, and running out is not an error.</p>
+
+      <h3 data-draft="s4-3"><span class="sec">§4.3</span>Two kinds of cookie</h3>
+      <p>The <code>cookie TEXT</code> card travels inside the decoded body. HTTP cookie login (§6.5) is a different mechanism.</p>
+    </section>
+
+    <section class="prose" id="sp-s5">
+      <h2 data-draft="s5"><span class="sec">§5</span>Cards</h2>
+
+      <h3 data-draft="s5-1"><span class="sec">§5.1</span>Lines and counted payloads</h3>
+      <p>A body is a sequence of LF-terminated lines. Some cards announce a byte count, and that many bytes follow straight after the card's LF. The payload can contain LF, and it ends only at the count. A <code>cfile</code> sender adds one more LF only when the compressed payload does not already end in one, and receivers read that pad as an empty line. A <code>config</code> payload is always followed by one LF (§9.3).</p>
+      <!--FIG:sp-framing-->
+
+      <h3 data-draft="s5-2"><span class="sec">§5.2</span>Card syntax</h3>
+      <p>A canonical card has tokens separated by one space, no leading or trailing whitespace, and one LF. Operators are lowercase ASCII letters, except <code>clone_seqno</code>. Fossilized arguments <span class="req">MUST</span> be decoded. Senders <span class="req">MUST</span> emit the canonical form. Receivers <span class="req">MUST</span> accept it, and <span class="req">MAY</span> also split on runs of space, tab, VT, FF or CR. There is no maximum line length (§5.2, §11.3).</p>
+      <p>What happens to a bad card depends on which side reads it and how far it gets:</p>
+      <div class="tbl-wrap wide"><table>
+        <thead><tr><th>Case</th><th>Server reading a request</th><th>Client reading a reply</th></tr></thead>
+        <tbody>
+          <tr><td>Unknown operator, wrong arity, or a card sent in the wrong direction</td><td>Discards the reply built so far, emits <code>error bad command: LINE</code>, and goes on with later cards. Earlier changes are not rolled back.</td><td>Logs a local warning, sends nothing, and stops reading this reply. The cards before it still count, and §3.7 is evaluated.</td></tr>
+          <tr><td>A <code>file</code>, <code>cfile</code> or <code>uvfile</code> handler rejects its card</td><td>Discards the reply so far, emits the handler's error, counts it, and stops reading the request.</td><td>Logs a warning, keeps the processed prefix, and continues as usual (§10.1).</td></tr>
+          <tr><td>Extra tokens</td><td colspan="2">Ignored beyond the six-token vector. <code>private</code> ignores any arguments. <code>igot HASH X</code> is private only when X is exactly <code>1</code>, and public otherwise.</td></tr>
+        </tbody>
+      </table></div>
+      <p>No “unknown message” reply text exists (§5.2, Appendix C).</p>
+
+      <h3 data-draft="s5-2-1"><span class="sec">§5.2.1</span>The nineteen operators</h3>
+      <p><code>login</code> <code>push</code> <code>pull</code> <code>cookie</code> <code>clone</code> <code>file</code> <code>cfile</code> <code>uvfile</code> <code>private</code> <code>igot</code> <code>uvigot</code> <code>gimme</code> <code>uvgimme</code> <code>reqconfig</code> <code>config</code> <code>clone_seqno</code> <code>pragma</code> <code>error</code> <code>message</code></p>
+
+      <h3 data-draft="s5-3"><span class="sec">§5.3</span>Comment lines</h3>
+      <p>A line starting with <code>#</code> is never dispatched as a card. Servers skip it. Clients skip it too, except for the timestamp line that ends a reply:</p>
+      <pre class="code"># timestamp 2026-07-02T18:31:13 errors 0</pre>
+      <p>The timestamp is exactly 19 bytes of UTC, used to estimate clock skew. The error count has no leading zeros and is informational. Senders <span class="req">MUST</span> use this form. Every request ends with a comment of random bytes, which changes the part of the body the login nonce covers. When a server answers <code>pragma req-clusters</code>, a non-empty run of cluster <code>igot</code> cards <span class="req">MUST</span> sit between <code># sending-clusters</code> and <code># end-of-clusters</code>. Receivers ignore both lines.</p>
+    </section>
+
+    <section class="prose" id="sp-s6">
+      <h2 data-draft="s6"><span class="sec">§6</span>Logging in</h2>
+      <h3 data-draft="s6-1"><span class="sec">§6.1</span>The login card</h3>
+      <pre class="code">login USER NONCE SIGNATURE</pre>
+      <p>USER is fossilized. NONCE and SIGNATURE are each 40 lowercase hex digits. A request may carry one login, in the body or in the cookie header. A second is fatal, and the server discards its output and emits an error. The users <code>anonymous</code> and <code>nobody</code>, and SSH connections, need no named login. The first clone round sends none.</p>
+
+      <h3 data-draft="s6-2"><span class="sec">§6.2</span>The nonce</h3>
+      <p>NONCE is the SHA-1 of every decompressed body byte after the login line's LF, through the end of the body. With cookie login it covers the whole body and none of the HTTP header.</p>
+      <h3 data-draft="s6-3"><span class="sec">§6.3</span>The shared secret</h3>
+      <pre class="code wide">shared-secret = SHA1(project-code "/" login-name "/" plaintext-password)</pre>
+      <p>The result is 40 lowercase hex digits, and the login name is exactly USER. The calculation applies once the project code is known. The first clone round sends no login card.</p>
+      <h3 data-draft="s6-4"><span class="sec">§6.4</span>The signature</h3>
+      <pre class="code">SIGNATURE = SHA1(NONCE-hex || shared-secret-hex)</pre>
+      <p>The random comment at the end of each request makes every nonce different. The tool below starts with the values from Appendix A.5.</p>
+      <div class="tool wide" data-nosearch id="sp-auth-tool">
+        <div class="tool-h"><b>Compute a login</b><span id="sp-auth-check"></span></div>
+        <div class="row">
+          <div class="field"><label for="sp-auth-user">User</label><input id="sp-auth-user" value="alice" spellcheck="false"></div>
+          <div class="field"><label for="sp-auth-pw">Password</label><input id="sp-auth-pw" value="secret-passphrase" spellcheck="false"></div>
+        </div>
+        <div class="field"><label for="sp-auth-pc">Project code</label><input id="sp-auth-pc" value="c1b2a3d4e5f60718293a4b5c6d7e8f9012345678" spellcheck="false"></div>
+        <div class="field"><label for="sp-auth-body">Body bytes after the login line</label><textarea id="sp-auth-body" rows="2" spellcheck="false">example-request-body-bytes</textarea></div>
+        <div class="readout" id="sp-auth-out"></div>
+      </div>
+
+      <h3 id="sp-verify"><span class="sec">§6.4</span>How the server checks a login</h3>
+      <p>Before reading any card, the server works out the caller's baseline capabilities from its session, cookie, HTTP Basic or remote-user setup. A successful login can only add capabilities to that baseline. A failed one leaves the baseline alone and ends processing.</p>
+      <ol class="plain">
+        <li><code>nobody</code> and <code>anonymous</code> succeed without a signature, and a configured matching remote user is honoured.</li>
+        <li>For a named user, the server treats the stored credential bytes as the shared secret and compares <code>SHA1(NONCE || stored)</code> with SIGNATURE, in constant time and case-sensitively.</li>
+        <li>If that fails and the stored credential is not exactly 40 bytes long, it derives the secret from the stored cleartext, the name and its own project code, and tries again.</li>
+        <li>Separately, NONCE must equal the SHA-1 of the body tail. A stored credential of exactly 40 bytes never gets the cleartext retry, so deployments that need that retry <span class="req">MUST</span> avoid 40-byte credentials.</li>
+      </ol>
+      <p>Either failure keeps HTTP 200, discards the staged output, emits <code>error login failed</code> and stops reading cards. Fossil keeps no replay cache. A login replay for pull alone is not rejected, while a replayed change can collide with the unique nonce column in the receipt table (§6.4, §11.1).</p>
+
+      <h3 data-draft="s6-5"><span class="sec">§6.5</span>Cookie login</h3>
+      <p>Newer servers take the login in an HTTP cookie. The client uses it only when the recorded server version and build time pass this gate:</p>
+      <pre class="code wide">VERSION &gt;= 22700 AND (DATE &gt; 20250727 OR (DATE == 20250727 AND TIME &gt;= 110500))
+
+Cookie: x-f-l-c=login+USER+NONCE+SIGNATURE</pre>
+      <p>Then the client <span class="req">MUST</span> leave out the body login. Spaces become <code>+</code>, and URL-unsafe bytes of the user name are percent-encoded. If the gate fails or no <code>server-version</code> has arrived yet, the client uses body login. Servers <span class="req">MUST</span> accept body login whatever the gate says. Sending both breaks the one-login rule. Appendix A.3 shows the switch: round 1 logs in in the body, and round 2, after the server reported 22800 from 2026-03-11, logs in by cookie.</p>
+
+      <h3 data-draft="s6-6"><span class="sec">§6.6</span>Capabilities</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Letter</th><th>Capability</th><th>Needed for</th></tr></thead>
+        <tbody>
+          <tr><td class="num">o</td><td>Read</td><td>Pull and discovery</td></tr>
+          <tr><td class="num">i</td><td>Write</td><td>Push</td></tr>
+          <tr><td class="num">g</td><td>Clone</td><td>Clone</td></tr>
+          <tr><td class="num">x</td><td>Private</td><td>Private content</td></tr>
+          <tr><td class="num">a</td><td>Admin</td><td>Configuration and user management</td></tr>
+        </tbody>
+      </table></div>
+      <p>The server checks each card's capability and emits an error when it is missing, unless the card's own section says to stay silent. The commit-lock pragmas follow only their lock-table rules (§9.4).</p>
+    </section>
+
+    <section class="prose" id="sp-s7">
+      <h2 data-draft="s7"><span class="sec">§7</span>Moving content</h2>
+      <h3 data-draft="s7-1"><span class="sec">§7.1</span>file</h3>
+      <pre class="code">file HASH SIZE
+file HASH DELTASRC SIZE</pre>
+      <p>SIZE bytes follow, uncompressed. The short form carries the whole artifact. The long form carries a Fossil delta against DELTASRC. Nothing follows the payload. Push and pull use <code>file</code>.</p>
+
+      <h3 data-draft="s7-2"><span class="sec">§7.2</span>cfile</h3>
+      <pre class="code">cfile HASH USIZE CSIZE
+cfile HASH DELTASRC USIZE CSIZE</pre>
+      <p>CSIZE frames the payload, which is the repository's stored compressed artifact or delta, sent byte for byte. USIZE is the full artifact's size, even in the delta form. It is parsed but not checked by the transfer layer. Clone version 3 always uses <code>cfile</code>, with no size threshold, pragma or capability negotiation.</p>
+
+      <h3 data-draft="s7-3"><span class="sec">§7.3</span>uvfile and the unversioned cards</h3>
+      <pre class="code">uvfile NAME MTIME HASH SIZE FLAGS
+uvigot NAME MTIME HASH SIZE          server to client
+uvgimme NAME                         client to server</pre>
+      <p>NAME is fossilized and MTIME is a non-negative Unix second. HASH is the content hash, or <code>-</code> for a deletion. Flag <code>0x0001</code> marks deletion and <code>0x0004</code> means the content is omitted. Senders <span class="req">MUST</span> clear the other bits, and receivers ignore them, so 6 reads as 4. The canonical deletion is <code>HASH -</code>, <code>SIZE 0</code>, flag 1.</p>
+      <p>Before applying a received <code>uvfile</code>, the receiver <span class="req">MUST</span> recompute its status from the current local row using §8.5.1 and <span class="req">MUST NOT</span> reuse a status it computed for an earlier <code>uvigot</code>. Sending unversioned changes to a server needs UV Write. When a server gets <code>uvgimme NAME</code> it looks the name up and sends nothing if it is absent, or the SHA3 version error for a SHA3 hash and an old client. If its reply has reached the output cap it sends <code>uvigot</code> instead, which brings another request. Otherwise it sends the full <code>uvfile</code>.</p>
+
+      <h3 data-draft="s7-4"><span class="sec">§7.4</span>Deltas whose source is missing</h3>
+      <p>A missing DELTASRC does not cause rejection. The receiver keeps the delta under HASH, deletes HASH's phantom and creates a phantom for DELTASRC, private or public to match the content card. HASH is recorded as dangling and is rebuilt later, once its source is available. The draft is explicit that nothing guarantees a later check of HASH against the rebuilt bytes. Fossil handles the source before it can notice that HASH is already stored, so a source phantom can be left behind even when HASH turns out to be a duplicate.</p>
+
+      <h3 data-draft="s7-5"><span class="sec">§7.5</span>Private content</h3>
+      <p>A bare <code>private</code> card marks the next <code>file</code> or <code>cfile</code> as private. Other cards and comments do not use up the mark. In a reply it always sets the mark. In a request it sets the mark only if the sender has the Private capability. Otherwise the server emits its authorization error and the content card that follows is treated as public. A client's mark lasts until used or the session ends, and a server's lasts until the end of its request.</p>
+      <ul class="plain">
+        <li>A sender <span class="req">MUST NOT</span> send a delta against a private source to a peer without Private permission. It sends full content instead.</li>
+        <li>A missing source for a marked delta becomes a private phantom, and for an unmarked delta a public one.</li>
+        <li><code>igot HASH 1</code> from a peer without permission is not an error. It creates no phantom but marks an existing HASH private.</li>
+        <li>Pulling private content needs a successful <code>pragma send-private</code>.</li>
+      </ul>
+
+      <h3 data-draft="s7-6"><span class="sec">§7.6</span>The SHA3 gate</h3>
+      <p>Never send a <code>file</code> or <code>cfile</code> named by a SHA3-256 hash, or a <code>uvfile</code> with a 64-digit hash, to a peer whose recorded VERSION is below 20000. The server treats an unknown client as version 0 until <code>client-version</code> arrives. The client assumes the server runs its own version until it sees <code>server-version</code>. At each refused artifact the sender emits</p>
+      <pre class="code">error Fossil\sversion\s2.0\sor\slater\srequired.</pre>
+      <p>and carries on with the other cards. It never substitutes a SHA1 name. Outside the first clone reply, a server error ends the client's card loop for that reply and §3.7 is evaluated. In the first clone reply, the error is ignored and the client makes its second clone request. When a sync runs automatically after a commit, an error matching <code>%not authorized to write%</code> marks autopush as failed and parsing continues.</p>
+
+      <h3 data-draft="s7-7"><span class="sec">§7.7</span>Hash policy on arrival</h3>
+      <p>The hash policy checks the received HASH, not its DELTASRC. Under <code>shun-sha1</code>, a non-clone <code>file</code> with a SHA1 name is read and thrown away, with no error and no change to the repository. A <code>cfile</code> with a SHA1 name is thrown away even during clone, though it still counts as a received card for §3.7(e). The draft points out one dead end. A delta can arrive against a SHA1 source, the client asks for the source, the source is discarded, and the session ends with that phantom unresolved.</p>
+      <p>Integrity is checked on the rebuilt artifact bytes, not on the wire payload. A repository's commit hook <span class="req">MUST</span> rehash each newly stored artifact whose full bytes are available and abort the commit on a mismatch. Storing and verifying a SHA3-256 artifact under the <code>auto</code> policy permanently moves the repository to <code>sha3</code>.</p>
+    </section>
+
+    <section class="prose" id="sp-s8">
+      <h2 data-draft="s8"><span class="sec">§8</span>Clone</h2>
+      <p>A clone begins with <code>pragma client-version</code>, <code>clone 3 1</code> and the random comment, with <code>pragma send-private</code> first when a private sync is requested. The first request carries no login. Later ones use normal authentication.</p>
+
+      <h3 data-draft="s8-1"><span class="sec">§8.1</span>Clone version</h3>
+      <pre class="code">clone VERSION SEQNO</pre>
+      <p>In version 3, the profile the draft specifies, the server sends <code>cfile</code> cards in storage order with the type <code>application/x-fossil-uncompressed</code>. Fossil accepts higher versions with the same behaviour, but only 3 is specified. A SEQNO of zero or less gets <code>error invalid clone sequence number</code>, a rollback and nothing else, so clients <span class="req">MUST</span> send a positive decimal SEQNO.</p>
+
+      <h3 data-draft="s8-2"><span class="sec">§8.2</span>The sequence cursor</h3>
+      <p>SEQNO is a RID, a row number in the server's blob table. The server serves rows from that RID upward and skips missing numbers silently, so clients <span class="req">MUST NOT</span> guess a count or size from the range. An accepting reply carries <code>cfile</code> cards in RID order, with any per-artifact SHA3 errors in place, then <code>clone_seqno NEXT</code>, then <code>push SERVERCODE PROJECTCODE</code> and the closing comment.</p>
+      <!--FIG:sp-cursor-->
+      <p>The client reissues <code>clone 3 NEXT</code> only if §3.7 says to continue, the reply had a well-formed <code>push</code>, and NEXT is positive. NEXT zero means the server has nothing more, and it bars any further clone, pull or push cards in the session. If §3.7 still wants a round, the client sends a cleanup request with no operation card: login if needed, <code>client-version</code>, pragmas, leftover <code>reqconfig</code>, <code>gimme</code> or <code>uvgimme</code>, the cookie and the random comment. With no direction in force, a <code>gimme</code> in cleanup <span class="req">MUST</span> produce neither content nor error, so any phantom left at that point stays unresolved.</p>
+      <pre class="code wide">SEQNO := 1
+first request := [send-private]; client-version; clone 3 1; randomness
+loop:
+  send; process reply in order; remember whether a well-formed push came
+  if first clone round and error: record any later push, ignore the error,
+     keep parsing; the second clone round is mandatory
+  if clone_seqno NEXT is decimal: SEQNO := NEXT
+  evaluate §3.7
+  if continue and push seen and SEQNO &gt; 0: next request has clone 3 SEQNO
+  else if continue: next request is the operation-less cleanup
+  else stop</pre>
+      <p>Clone rounds have no push direction, so a server ignores any <code>igot</code> a cloning client sends, and a client <span class="req">SHOULD NOT</span> send them. A server <span class="req">MUST</span> accept and ignore <code>igot</code> cards that arrive without push.</p>
+
+      <h3 data-draft="s8-3"><span class="sec">§8.3</span>The first clone round</h3>
+      <p>The first request has no login. Any error in its reply is ignored as an error, whether it is about private access, Clone permission or the SHA3 gate. The client reads the rest of the reply, records any <code>push</code>, keeps its unversioned send table as it is, and sends the mandatory second request. Appendix A.2 shows this with a client too old for SHA3 artifacts.</p>
+
+      <h3 data-draft="s8-4"><span class="sec">§8.4</span>Configuration during clone</h3>
+      <p>The client holds back <code>reqconfig</code> and <code>uv-hash</code> until after round 0. Once Clone permission is confirmed, a server with unversioned sync enabled sends <code>pragma uv-pull-only</code> and its full unversioned catalog straight away in the clone reply, without waiting for the client's hash.</p>
+
+      <h3 data-draft="s8-5"><span class="sec">§8.5</span>Push, pull and sync</h3>
+      <p><code>push SERVERCODE PROJECTCODE</code>, <code>pull …</code>, or both choose the direction. A projectcode mismatch is fatal. Pulling turns the server's <code>igot</code> cards into client phantoms. Pushing turns the client's <code>igot</code> cards into server phantoms. <code>gimme</code> fetches the content.</p>
+
+      <h3 data-draft="s8-5-1"><span class="sec">§8.5.1</span>Unversioned files</h3>
+      <p>At the start of a session the client fills its send table with every local unversioned row that has a hash and is not marked mtime-only. Tombstones are left out. On the first eligible round, never clone round 0, it sends <code>pragma uv-hash HASH</code> once. HASH is the SHA-1 of one line per non-tombstone row, sorted bytewise by name:</p>
+      <pre class="code">NAME SP YYYY-MM-DD SP HH:MM:SS SP HASH LF</pre>
+      <p>If the hashes match, the server sends no catalog. Otherwise, given Read permission, it sends <code>pragma uv-push-ok</code> or <code>uv-pull-only</code> and then one <code>uvigot</code> for every entry, tombstones included. For each <code>uvigot</code> the client compares the remote entry with its own row and picks one of six outcomes:</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Status</th><th>When</th><th>What the client does</th></tr></thead>
+        <tbody>
+          <tr><td>0</td><td>No local row</td><td>Asks for the file with <code>uvgimme</code>, unless the remote entry is a deletion</td></tr>
+          <tr><td>1</td><td>Hashes differ and the remote is newer</td><td>The remote wins: asks for the content, or records the deletion</td></tr>
+          <tr><td>2</td><td>Same hash, remote newer</td><td>Updates the local mtime only</td></tr>
+          <tr><td>3</td><td>Same hash, same mtime</td><td>Nothing</td></tr>
+          <tr><td>4</td><td>Same hash, local newer</td><td>Sends its mtime, if uploads are allowed</td></tr>
+          <tr><td>5</td><td>Hashes differ and the local copy is newer</td><td>The local copy wins: sends it, if uploads are allowed</td></tr>
+        </tbody>
+      </table></div>
+      <p>Try a comparison:</p>
+      <div class="tool wide" data-nosearch id="sp-uv-tool">
+        <div class="tool-h"><b>Compare one unversioned file</b><span>Leave the local hash empty for “no local row”; use - for a deletion</span></div>
+        <div class="row">
+          <div class="field"><label for="sp-uv-lh">Local hash</label><input id="sp-uv-lh" value="b1c1b05fea4f52bd90b15fdffd13f5c91dce6505f498eeb79b4952c2ea8d4d15" spellcheck="false"></div>
+          <div class="field"><label for="sp-uv-lm">Local mtime</label><input id="sp-uv-lm" inputmode="numeric" value="1782930646"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label for="sp-uv-rh">Remote hash (uvigot)</label><input id="sp-uv-rh" value="f5116517775075ea483901021282ba97eebe5a2b993a47eb78198adc10efe128" spellcheck="false"></div>
+          <div class="field"><label for="sp-uv-rm">Remote mtime (uvigot)</label><input id="sp-uv-rm" inputmode="numeric" value="1782930700"></div>
+        </div>
+        <div class="row"><span id="sp-uv-status"></span><div class="stats" id="sp-uv-stats"></div></div>
+        <div class="readout" id="sp-uv-out"></div>
+      </div>
+      <p>When the times are equal and the hashes differ, the bytewise order of the hashes breaks the tie. Revert maps 4 to 2 and 5 to 1, and dry-run changes nothing. Statuses 0 to 3 remove the name from the send table. A pull-only session removes 4 and 5 too. Each qualifying <code>uvigot</code> appends one <code>uvgimme</code>, with no retry table. When remote content wins, the old local row is deleted at once and is not restored if the transfer later fails. During the upload phase the client sends each selected row from its send table and removes it. If the request grows past the usual output threshold, it stops there and §3.7(b) carries the rest into the next round.</p>
+      <p>Fossil can send a short, malformed <code>uvigot</code> during upload, and the server treats it as a bad command. The draft calls this a source defect, and a cleanroom sender <span class="req">MUST NOT</span> emit it.</p>
+
+      <h3 data-draft="s8-6"><span class="sec">§8.6</span>igot and gimme</h3>
+      <p><code>igot HASH</code> announces a public artifact, <code>igot HASH 1</code> a private one, and <code>gimme HASH</code> asks for content. They can come in any order. Peers dated before 2020-04-13 get no private <code>igot</code> at all. The client holds its private inventory back until <code>server-version</code> tells it the peer's date, then appends it to the next request, and §3.7(c) sends that request.</p>
+
+      <h3 data-draft="s8-6-1"><span class="sec">§8.6.1</span>Branches, tags and leaves are derived</h3>
+      <p>No card carries a branch, tag, leaf or closed marker. Each peer derives them from stored artifacts per the Artifact Format and Repository State drafts. The current trunk also depends on each peer's own main-branch setting, so two synced peers can disagree about it. While phantoms remain, the views cover only what is present and can change later without any sync error.</p>
+
+      <h3 data-draft="s8-7"><span class="sec">§8.7</span>Phantom records</h3>
+      <p>§3.3 is authoritative.</p>
+      <h3 data-draft="s8-8"><span class="sec">§8.8</span>Which phantoms to ask for</h3>
+      <p>Each round filters <code>gimme</code> candidates by peer-lacks, shun and private as §3.3 says. The filters belong to the round and are never saved.</p>
+      <h3 data-draft="s8-9"><span class="sec">§8.9</span>Loop termination</h3>
+      <p>§3.7 is authoritative. The server keeps no state and signals no completion.</p>
+    </section>
+
+    <section class="prose" id="sp-s9">
+      <h2 data-draft="s9"><span class="sec">§9</span>Pragmas</h2>
+      <p><code>pragma NAME [ARGUMENTS]</code> is an ordinary card. Unknown names <span class="req">MUST</span> be ignored silently. A known name sent in the wrong direction is treated the same way and <span class="req">MUST NOT</span> change state. A bare <code>pragma</code> with no name is an unknown card and gets <code>error bad command</code>. A known pragma whose condition fails does nothing and raises no error.</p>
+      <div class="tbl-wrap wide"><table>
+        <thead><tr><th>Pragma</th><th>Direction</th><th>§</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>client-version V D T</code></td><td>to server</td><td>9.1</td><td>Client release, date and time. Required in every request.</td></tr>
+          <tr><td><code>server-version V D T</code></td><td>to client</td><td>9.1</td><td>Server release, date and time. Sets the SHA3, private-igot and cookie gates.</td></tr>
+          <tr><td><code>uv-hash HASH</code></td><td>to server</td><td>9.2</td><td>Hash of the client's unversioned catalog.</td></tr>
+          <tr><td><code>uv-push-ok</code>, <code>uv-pull-only</code></td><td>to client</td><td>9.2</td><td>Whether the client may upload unversioned files. Precedes the catalog.</td></tr>
+          <tr><td><code>ci-lock HASH ID</code>, <code>ci-unlock ID</code></td><td>to server</td><td>9.4</td><td>Take or release a check-in lock.</td></tr>
+          <tr><td><code>ci-lock-fail LOGIN MTIME</code></td><td>to client</td><td>9.4</td><td>Someone else holds the lock.</td></tr>
+          <tr><td><code>send-private</code></td><td>to server</td><td>9.5</td><td>Ask for private content. Needs <code>x</code>.</td></tr>
+          <tr><td><code>send-catalog</code>, <code>req-clusters</code></td><td>to server</td><td>9.5</td><td>Ask for a full inventory, or for cluster <code>igot</code> cards.</td></tr>
+          <tr><td><code>client-url URL</code>, <code>req-links</code></td><td>to server</td><td>9.5</td><td>Tell the server where the client syncs from, and ask for alternative locations.</td></tr>
+          <tr><td><code>link URL ARG MTIME</code></td><td>to client</td><td>9.5</td><td>An alternative location for this repository, only in reply to <code>req-links</code>.</td></tr>
+          <tr><td><code>avoid-delta-manifests</code></td><td>to client</td><td>9.5</td><td>Send manifests in full for the rest of the session.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3 data-draft="s9-1"><span class="sec">§9.1</span>Version negotiation</h3>
+      <p>A full <code>pragma client-version VERSION DATE TIME</code> sets the server's view of the client, with DATE and TIME as <code>YYYYMMDD</code> and <code>HHMMSS</code>, and makes the server answer with a full <code>server-version</code>. A short form with three or four tokens updates only VERSION and gets no answer. The client applies the same rule to <code>server-version</code>. Until one arrives it assumes the peer runs its own release, dated <code>00000000</code> <code>000000</code>. In Appendix A.1, <code>22800</code> is Fossil 2.28.00.</p>
+
+      <h3 data-draft="s9-2"><span class="sec">§9.2</span>Unversioned-file pragmas</h3>
+      <p>The client sends <code>uv-hash</code> at most once, and never in clone round 0. A matching hash gets no response. On a mismatch, a server with Read sends exactly one <code>uv-push-ok</code> if the caller may write unversioned files, or one <code>uv-pull-only</code> otherwise, and then the full catalog. <code>uv-pull-only</code> drops the client's local-only status 4 and 5 entries. The canonical hash is SHA-1, but the server also accepts an artifact hash such as SHA3-256 and treats a mismatch as usual.</p>
+
+      <h3 data-draft="s9-3"><span class="sec">§9.3</span>Configuration</h3>
+      <p><code>reqconfig /NAME</code> asks for a configuration group. Without Read the server ignores it, and an unknown group gets no cards and no error. Clone holds these requests back. The answer is <code>config GROUPNAME SIZE</code>, exactly SIZE bytes, and one mandatory LF. A Fossil-compatible receiver consumes that byte without checking it. Scalar settings always arrive as <code>config /config SIZE</code> with this payload:</p>
+      <pre class="code">MTIME SP 'name' SP value SP 'value'</pre>
+      <p>Values are wrapped in <code>'</code> with inner quotes doubled. Table groups use their own group name, and their row format is out of scope. A server <span class="req">MUST</span> require Admin to apply a pushed <code>config</code> card, and otherwise emits <code>error not authorized to push configuration</code>. A <code>config</code> card whose SIZE is not plain decimal takes the unknown-card path. The four transfer-hook settings travel as scalar <code>/config</code> and run only on the server.</p>
+
+      <h3 data-draft="s9-4"><span class="sec">§9.4</span>Check-in locks</h3>
+      <p><code>pragma ci-lock HASH CLIENT-ID</code> asks for a check-in lock on HASH, kept as a <code>ci-lock-HASH</code> row on the server. The server first deletes lock rows that have timed out or whose HASH is no longer a leaf. If a live lock on HASH remains and it belongs to a different client, the server replies <code>pragma ci-lock-fail LOGIN MTIME</code>. If it belongs to the same client, the server says nothing. Otherwise it writes a new lock and sends no acknowledgement. Silence after <code>ci-lock</code> confirms nothing. <code>pragma ci-unlock CLIENT-ID</code> deletes that client's locks and any invalid rows, again with no reply and no Write check. The client sends it whenever it has a stored ID and no current lock, so it may repeat.</p>
+
+      <h3 data-draft="s9-5"><span class="sec">§9.5</span>Private content and discovery</h3>
+      <ul class="plain">
+        <li><code>send-private</code> turns on private sync only for a caller with <code>x</code>. Otherwise it appends <code>error not authorized to sync private content</code> without discarding the reply. Clients repeat it in every private round.</li>
+        <li><code>send-catalog</code> makes a read-authorized server announce every eligible artifact it holds, after the §3.3 filters.</li>
+        <li><code>req-clusters</code> asks for public cluster <code>igot</code> cards, wrapped in the §5.3 comments.</li>
+        <li><code>req-links</code> lets the reply to that request carry <code>pragma link URL ARG MTIME</code>. Without it the server <span class="req">MUST</span> send no links. The client stores ARG verbatim and <span class="req">MUST NOT</span> parse, change or forward it. Links are optional, and they say nothing about artifacts.</li>
+        <li><code>client-url URL</code> is stored by a server whose caller has Write, as <code>syncfrom:</code> followed by a normalised URL, unless the host contains <code>localhost</code>. The draft spells the normalisation out in detail.</li>
+        <li><code>avoid-delta-manifests</code> makes the client send full manifests, not deltas, for the rest of the session.</li>
+      </ul>
+    </section>
+
+    <section class="prose" id="sp-s10">
+      <h2 data-draft="s10"><span class="sec">§10</span>Errors and messages</h2>
+      <h3 data-draft="s10-1"><span class="sec">§10.1</span>The error card</h3>
+      <pre class="code">error TEXT</pre>
+      <p>TEXT is fossilized and <span class="req">MUST</span> be decoded. HTTP status stays 200 throughout. On the server, each request that reaches card processing runs in one database write transaction, and errors fall into three kinds:</p>
+      <div class="tbl-wrap wide"><table>
+        <thead><tr><th>Kind</th><th>Examples</th><th>Server output</th><th>Transaction</th></tr></thead>
+        <tbody>
+          <tr><td>Append</td><td>SHA3 gate, unauthorized <code>send-private</code></td><td>Error added, parsing continues</td><td>Commits at the end of the request</td></tr>
+          <tr><td>Reset</td><td>Wrong project, authorization, duplicate login, unknown card</td><td>Partial output discarded, then the error</td><td>Earlier changes still commit</td></tr>
+          <tr><td>Fail-fast</td><td><code>invalid clone sequence number</code>, <code>invalid config record</code></td><td>Error and stop</td><td>Rolled back</td></tr>
+        </tbody>
+      </table></div>
+      <p>A failure before card processing, such as a schema-out-of-date response, returns before any transaction opens. A refused clone is a reset site that still writes <code>push</code> before the error.</p>
+      <p>On the client, an ordinary server error commits the cards already processed, ends that reply's card loop and sends the client to §3.7. It ends the session only if §3.7 finds nothing to do. Errors in the first clone reply are dropped as errors while the rest of the reply is still read. A content or integrity error found by a handler gives a warning and processing continues as usual. Only an explicit fail-fast path rolls back the round and stops. A private mark already used up by a handler is not restored by a rollback.</p>
+
+      <h3 data-draft="s10-2"><span class="sec">§10.2</span>The message card</h3>
+      <pre class="code">message TEXT</pre>
+      <p>A message has exactly two tokens, is decoded and is never fatal. A client <span class="req">MAY</span> show it and <span class="req">MUST</span> change no state, with one exception. If push is on and the text matches the glob <code>pull only *</code>, case-sensitively, the client turns push off for the session and hides the message. Cards already queued for the next request stay queued, but later <code>gimme</code> cards in the same reply <span class="req">MUST NOT</span> append content. Later requests carry no <code>push</code>, while unversioned uploads stay allowed.</p>
+    </section>
+
+    <section class="prose" id="sp-s11">
+      <h2 data-draft="s11"><span class="sec">§11</span>Security considerations</h2>
+      <ul class="plain">
+        <li>Body login sends a user, a nonce and a signature, never the password. HTTP Basic and proxy credentials are outside that property.</li>
+        <li>A sender <span class="req">MUST</span> enforce the 20000 SHA3 gate and <span class="req">MUST NOT</span> truncate, rename or downgrade SHA3 names (§11.4).</li>
+        <li>There is no login replay cache. A byte-for-byte replay with a valid signature is not rejected for that reason. The nonce stored with a change's receipt is unique, but that is a separate matter from replay protection (§11.1).</li>
+        <li>Nothing stops sync over plain HTTP, which exposes logins, private artifacts and cookie logins to anyone reading the traffic. Deployments <span class="req">SHOULD</span> use HTTPS, SSH or another confidential, integrity-protected, server-authenticated transport (§11.2).</li>
+        <li>There is no per-line limit. Payload sizes come from declared counts and storage policy (§11.3).</li>
+      </ul>
+    </section>
+
+    <section class="prose" id="sp-s12">
+      <h2 data-draft="s12"><span class="sec">§12</span>IANA considerations</h2>
+      <p>The draft registers three media types and needs no port or service name.</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Media type</th><th>Encoding</th><th>Intended usage</th></tr></thead>
+        <tbody>
+          <tr><td><code>application/x-fossil</code></td><td>zlib-compressed sync</td><td>COMMON</td></tr>
+          <tr><td><code>application/x-fossil-debug</code></td><td>Uncompressed sync, for debugging and tests</td><td>LIMITED USE</td></tr>
+          <tr><td><code>application/x-fossil-uncompressed</code></td><td>Uncompressed clone reply with compressed <code>cfile</code> payloads; replies only</td><td>COMMON</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section class="prose" id="sp-sA">
+      <h2 data-draft="sA"><span class="sec">App. A</span>Examples</h2>
+      <p>The examples show decompressed bodies. The replay tool in §3 steps through A.1, A.2 and the last scenario of A.3.</p>
+      <h3 data-draft="sA-1"><span class="sec">A.1</span>Push and pull in two rounds</h3>
+      <p>The client announces three artifacts. The server asks for two and announces two of its own, so the client makes two phantoms. In round 2 each side sends the other what it asked for, and no round 3 is needed. Anonymous push and pull are allowed, so no login appears. The first <code>file</code> payload in round 2 is a 272-byte manifest of seven lines, each ending in LF, and the second is the 26-byte line <i>alpha content from client</i> with its LF. The reply's payloads are exactly 270 and 31 bytes. The counts frame them, and the lines inside are payload, not cards.</p>
+      <h3 data-draft="sA-2"><span class="sec">A.2</span>The SHA3 gate in a clone</h3>
+      <p>A client reporting release 19999 asks to clone. The server refuses a SHA3 artifact with the version error, then sends <code>clone_seqno 0</code> and a <code>push</code>. No SHA1 fallback happens, and the client still makes the required second request.</p>
+      <h3 data-draft="sA-3"><span class="sec">A.3</span>Private content</h3>
+      <p>An anonymous pull never sees private artifacts. A crafted <code>gimme</code> for a private hash gets an <code>igot … 1</code> announcement. An unauthorized <code>send-private</code> gets an error and the public inventory. An authorized user logs in, pulls, and receives two private files, the second as a delta against a public artifact.</p>
+      <h3 data-draft="sA-4"><span class="sec">A.4</span>Comment lines</h3>
+      <p>Random comments are ignored as cards. The timestamp estimates clock skew, and <code>errors 0</code> is informational.</p>
+      <h3 data-draft="sA-5"><span class="sec">A.5</span>Authentication</h3>
+      <p>The user, password, project code and covered body behind the three SHA-1 values loaded into the §6 tool.</p>
+    </section>
+
+    <section class="prose" id="sp-sB">
+      <h2 data-draft="sB"><span class="sec">App. B</span>Collected grammar</h2>
+      <p>An excerpt of the draft's ABNF (RFC 5234). Payload lengths come from the counts in the prose, which ABNF cannot express.</p>
+      <pre class="code wide" data-abnf>sync-message     = 1*( sync-element )
+sync-element     = bare-card / file-transfer / cfile-transfer /
+                   uvfile-transfer / config-transfer / comment-line
+file-transfer    = file-card payload-octets
+cfile-transfer   = cfile-card payload-octets [ LF ]
+uvfile-transfer  = uvfile-card [ payload-octets ]
+config-transfer  = config-card payload-octets LF
+
+push-card        = "push" SP servercode SP projectcode LF
+pull-card        = "pull" SP servercode SP projectcode LF
+clone-card       = "clone" SP decimal SP decimal LF
+clone-seqno-card = "clone_seqno" SP decimal LF
+igot-card        = "igot" SP artifact-hash LF /
+                   "igot" SP artifact-hash SP "1" LF
+gimme-card       = "gimme" SP artifact-hash LF
+file-card        = "file" SP artifact-hash SP decimal LF /
+                   "file" SP artifact-hash SP artifact-hash SP decimal LF
+cfile-card       = "cfile" SP artifact-hash SP decimal SP decimal LF /
+                   "cfile" SP artifact-hash SP artifact-hash SP decimal
+                   SP decimal LF
+login-card       = "login" SP user SP nonce SP signature LF
+error-card       = "error" SP fossilized LF
+artifact-hash    = sha1-hash / sha3-hash   ; 40 or 64 lowercase hex
+timestamp-comment = "# timestamp" SP timestamp SP "errors" SP canonical-decimal LF</pre>
+    </section>
+
+    <section class="prose" id="sp-sC">
+      <h2 data-draft="sC"><span class="sec">App. C</span>Two corrections to older descriptions</h2>
+      <div class="tbl-wrap wide"><table>
+        <thead><tr><th>Older text says</th><th>The protocol actually</th></tr></thead>
+        <tbody>
+          <tr><td>An unknown card gets an “unknown message” reply.</td><td>Has no such text. A server discards its output, emits <code>error bad command: LINE</code> and carries on. A client logs a warning, stops reading that reply and evaluates §3.7.</td></tr>
+          <tr><td>Several logins in one request add up their permissions.</td><td>Treats a second login as fatal. One successful login adds to the request's baseline capabilities only.</td></tr>
+        </tbody>
+      </table></div>
+    </section>

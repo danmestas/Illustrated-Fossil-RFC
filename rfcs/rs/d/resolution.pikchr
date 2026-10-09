@@ -1,0 +1,16 @@
+margin = 0.15in
+boxht = 0.5
+$gap = 0.3
+$drop = 0.4
+
+# Section 10.2: trunk forks; the newer leaf is closed.
+FORK: box "fork point" bold "trunk" small wid 1.0
+OPEN: box "b05cbea82b" mono bold "open · listed by leaves" small wid 1.95 with .w at FORK.e + ($gap, 0)
+CLOSED: box "ee3a7eed71" mono bold "closed · trunk resolves here" small wid 1.95 fill 0x0C0003 with .nw at OPEN.se + ($gap, -$drop)
+
+arrow from FORK.e to OPEN.w
+arrow from FORK.s down until even with CLOSED then to CLOSED.w
+
+# Horizontal position is mtime.
+AXIS: arrow from (FORK.w.x, CLOSED.s.y - 0.3) to (CLOSED.e.x, CLOSED.s.y - 0.3)
+text "later mtime" small rjust at (CLOSED.e.x, AXIS.y - 0.18)

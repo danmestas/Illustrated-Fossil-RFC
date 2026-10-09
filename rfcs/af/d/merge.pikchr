@@ -1,0 +1,32 @@
+margin = 0.15in
+boxht = 0.5
+boxwid = 1.1
+$gap = 0.55
+$col = 0.18
+
+# Baseline A.4.1: one column per filename, in sorted order.
+BASE_A: box "file-a.txt" mono bold "b3cd28e8…" mono small
+BASE_B: box "file-b.txt" mono bold "780ac49d…" mono small with .w at BASE_A.e + ($col, 0)
+BASE_C: box "file-c.txt" mono bold "a37be80e…" mono small with .w at BASE_B.e + ($col, 0)
+
+# Delta A.4.2, each entry under the name it changes.
+DELTA_A: box "file-a.txt" mono bold "a61d8bf8…" mono small fill 0x0C0003 with .n at BASE_A.s - (0, $gap)
+DELTA_C: box "file-c.txt" mono bold "no hash" small dashed with .n at BASE_C.s - (0, $gap)
+DELTA_D: box "file-d.txt" mono bold "4ff0cf8d…" mono small fill 0x0C0003 with .w at DELTA_C.e + ($col, 0)
+
+# Reconstructed set.
+OUT_A: box "file-a.txt" mono bold "a61d8bf8…" mono small fill 0x0C0003 with .n at DELTA_A.s - (0, $gap)
+OUT_B: box "file-b.txt" mono bold "780ac49d…" mono small with .n at (BASE_B.x, DELTA_A.s.y - $gap)
+OUT_D: box "file-d.txt" mono bold "4ff0cf8d…" mono small fill 0x0C0003 with .n at DELTA_D.s - (0, $gap)
+
+text "baseline" small rjust at BASE_A.w - (0.12, 0)
+text "delta" small rjust at (BASE_A.w.x - 0.12, DELTA_A.y)
+text "result" small rjust at OUT_A.w - (0.12, 0)
+text "modify" small at (OUT_A.x, OUT_A.s.y - 0.2)
+text "carry forward" small at (OUT_B.x, OUT_A.s.y - 0.2)
+text "delete" small at (DELTA_C.x, OUT_A.s.y - 0.2)
+text "add" small at (OUT_D.x, OUT_A.s.y - 0.2)
+
+arrow from DELTA_A.s to OUT_A.n
+arrow from BASE_B.s to OUT_B.n
+arrow from DELTA_D.s to OUT_D.n

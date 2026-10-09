@@ -1,0 +1,6 @@
+{
+  "states": "§3.8 · the client's five states; EXCHANGE repeats while any §3.7 limb holds",
+  "container": "§4.1 · the compressed container: a length prefix, then a zlib stream that inflates to the card text",
+  "framing": "§5.1 · a payload ends at its declared count; cfile adds one LF only when its payload lacks one",
+  "cursor": "§8.2 · the clone cursor walks the blob table by RID, skipping gaps (an example split into two rounds)"
+}

@@ -1,0 +1,14 @@
+# Every push and every landing's merge: the tests, and wrangler's dry run of
+# the Worker config, which builds the site and validates it without
+# credentials. Jobs run on zeitforge's runner for this repository as its pool
+# user (quarry RFC 0019).
+on: [push, landing]
+jobs:
+  test:
+    timeout-minutes: 15
+    steps:
+      - run: npm test
+  worker:
+    timeout-minutes: 10
+    steps:
+      - run: npx --yes wrangler@4.138.0 deploy --dry-run --outdir dist-dry-run

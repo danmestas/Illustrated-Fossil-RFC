@@ -1,0 +1,26 @@
+# A tag version-X.Y.Z on a trunk check-in deploys that check-in to the
+# illustrated-fossil-rfc Worker: the tests again, then scripts/release.sh,
+# which checks the tag against CHANGELOG.md and runs wrangler deploy.
+#
+# The Cloudflare token is the production environment's secret in repository
+# settings. The environment admits trunk only, so a tag on any other branch
+# runs the tests and cannot deploy (quarry RFC 0019). To repeat a release,
+# cancel the tag and add it again.
+on:
+  tag:
+    tags: [version-*]
+jobs:
+  test:
+    timeout-minutes: 15
+    steps:
+      - run: npm test
+  release:
+    needs: [test]
+    environment: production
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_ACCOUNT_ID: a8d3b022875aef5e907b1cc9404376ad
+    steps:
+      - run: sh scripts/release.sh "${QUARRY_TAG#version-}"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

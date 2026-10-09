@@ -1,0 +1,4 @@
+{
+  "propagation": "§3.2, §5.4 · a branch tag walks primary links only: a direct tag at f1 stops trunk's, and the dashed merge into c5 carries nothing",
+  "resolution": "§10.2 · trunk resolves to the newest check-in with sym-trunk, closed or not; leaves lists only the older open one"
+}
