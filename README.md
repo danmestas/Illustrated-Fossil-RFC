@@ -79,6 +79,14 @@ repository's settings, given to trunk check-ins only. To repeat a release,
 cancel the tag and add it again. Every push and landing runs `ci/test.yml`:
 the tests and `wrangler deploy --dry-run`.
 
+## Where it lives
+
+The repository is [zeitforge.app/r/Illustrated-Fossil-RFC](https://zeitforge.app/r/Illustrated-Fossil-RFC).
+[github.com/danmestas/Illustrated-Fossil-RFC](https://github.com/danmestas/Illustrated-Fossil-RFC)
+is a mirror of trunk, pushed by `ci/mirror.yml` after every trunk check-in
+(`scripts/mirror.sh`, with a deploy key from the `production` environment).
+Nothing is committed on the GitHub side.
+
 ## License
 
 The code is under the [Zero-Clause BSD license](LICENSE). The drafts in

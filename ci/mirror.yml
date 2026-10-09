@@ -1,0 +1,14 @@
+# Every check-in on trunk is pushed to the GitHub mirror (scripts/mirror.sh).
+# The deploy key is the production environment's secret, given to trunk
+# check-ins only (quarry RFC 0019).
+on:
+  push:
+    branches: [trunk]
+jobs:
+  mirror:
+    environment: production
+    timeout-minutes: 10
+    steps:
+      - run: sh scripts/mirror.sh
+        env:
+          GITHUB_MIRROR_KEY: ${{ secrets.GITHUB_MIRROR_KEY }}
