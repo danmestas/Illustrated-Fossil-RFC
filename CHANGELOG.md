@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1
+
+- go-libfossil 0.11.1: the sync server sends content only to a client that
+  may read it, and a sync never follows a redirect from HTTPS to HTTP.
+
 ## 0.3.0
 
 Each draft's repository takes pushes. Anyone can clone and pull; the accounts
