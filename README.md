@@ -14,8 +14,21 @@ State and Sync Protocol — as one site. Each draft has three views:
   every artifact's name, a rebuild of the derived tables, and an animated
   sync between two copies.
 
-It is served as an assets-only Cloudflare Worker, `illustrated-fossil-rfc`:
-Cloudflare serves the built site directly, with no Worker script.
+Each repository can also be cloned and pulled with stock `fossil`:
+
+```sh
+fossil clone https://illustrated-fossil-rfc.daniel-mestas.workers.dev/delta-format delta.fossil
+```
+
+The other three are `/artifact-format`, `/repo-state` and `/sync-protocol`.
+They are read-only: a push is refused.
+
+It is served as a Cloudflare Worker, `illustrated-fossil-rfc`. Cloudflare
+serves the built site as static assets. The Worker script
+(`worker/index.js`) answers what no asset does: a sync request to `/NAME` is
+handed to a second go-libfossil program, `wasm/server/main.go`, which
+answers it from a fresh in-memory copy of `repos/NAME.fossil`, so nothing a
+client sends outlives its request.
 
 ## Building and testing
 
@@ -23,7 +36,7 @@ Node 22 or later, and `fossil` on the PATH (the build reads each draft from
 its repository).
 
 ```sh
-npm test              # build checks, renderer, syntax diagrams, delta codec, go-libfossil
+npm test              # build checks, renderer, syntax diagrams, delta codec, go-libfossil, sync server
 npm run build         # the site, into dist/
 npm start             # build and serve dist/ on http://127.0.0.1:8790
 npm run build:artifact  # the claude.ai artifact layout, into dist-artifact/
@@ -44,20 +57,23 @@ binary as base64 text beside it.
 | `railroad.js` | ABNF to Pikchr syntax diagrams |
 | `delta.js` | Fossil's delta codec, for the playground |
 | `rfcs/repos/*.fossil` | each draft's repository |
-| `wasm/` | the go-libfossil program the Repository view runs, and its build |
+| `wasm/` | the go-libfossil programs the Repository view and the sync server run, and their build |
+| `worker/` | the Worker script: sync requests to the server, everything else to the assets |
 | `vendor/` | Pikchr's WebAssembly build (from pikchr-studio) and Go's `wasm_exec.js` (Go 1.27.1) |
 
 ## The go-libfossil build
 
-`wasm/rfcrepo.wasm.gz` is committed. `wasm/main.go` uses go-libfossil's
-internal packages, so it is compiled inside a checkout of that module, at the
-commit in `wasm/GO-LIBFOSSIL`:
+`wasm/rfcrepo.wasm.gz` (the Repository view, from `wasm/main.go`) and
+`wasm/rfcserver.wasm.gz` (the sync server, from `wasm/server/main.go`) are
+committed. `wasm/main.go` uses go-libfossil's internal packages, so both are
+compiled inside a checkout of that module, at the commit in
+`wasm/GO-LIBFOSSIL`:
 
 ```sh
 sh wasm/build.sh ~/projects/go-libfossil
 ```
 
-With Go 1.27.1 the result is byte for byte the committed file.
+With Go 1.27.1 the results are byte for byte the committed files.
 
 ## The repositories
 
@@ -65,6 +81,10 @@ With Go 1.27.1 the result is byte for byte the committed file.
 history: every distinct version of each draft, with its original check-in
 date, author and comment, then the 29 July 2026 revision from
 `~/fossil-rfc`.
+
+Every repository is published and served, so the build clears every
+account's password and capabilities but `nobody`'s: no one can log in to
+them, and `nobody` can clone and pull but not push.
 
 ## Releases
 

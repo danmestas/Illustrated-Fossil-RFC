@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0
+
+Each draft's repository can be cloned and pulled with stock `fossil`, from
+`/delta-format`, `/artifact-format`, `/repo-state` and `/sync-protocol`.
+
+- The Worker answers Fossil's sync protocol with a second go-libfossil
+  program, from a fresh copy of the repository per request. It is read-only:
+  a push is refused.
+- The repositories carry no account that can log in: every password and
+  capability but `nobody`'s is cleared.
+
 ## 0.1.0
 
 The four Fossil RFC drafts as one site on Cloudflare Workers: the Delta
