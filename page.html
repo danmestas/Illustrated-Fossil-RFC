@@ -651,7 +651,7 @@ LF        = %x0A</pre>
     <header class="hero">
       <div class="eyebrow" id="repoEyebrow">delta-format.fossil · running in your browser</div>
       <h1>The draft, as a Fossil repository</h1>
-      <p class="lede">The Draft text view reads its text from a real Fossil repository shipped alongside this page and opened here with go-libfossil, compiled to WebAssembly. Nothing is cloned or fetched from a server.</p>
+      <p class="lede">The Draft text view reads its text from a real Fossil repository, opened here with go-libfossil, compiled to WebAssembly.</p>
       <div class="repo-card" data-nosearch>
         <div class="repo-facts" id="repoFacts"><span class="status" id="repoState">Loading Fossil (5.9 MB)</span></div>
         <div class="row">
@@ -660,6 +660,15 @@ LF        = %x0A</pre>
         </div>
       </div>
     </header>
+    <section class="prose" id="r-fossil" hidden>
+      <h2>Clone, pull and push</h2>
+      <p>This site is also a Fossil server for each draft's repository, so stock <code>fossil</code> works against it. Clone the repository and open a working copy:</p>
+      <pre class="code wide" id="fossilClone"></pre>
+      <p>A clone remembers where it came from, so <code>fossil pull</code> in the working copy brings in what has been pushed since.</p>
+      <p>Anyone can clone and pull. Pushing needs an account on this server: give your login in the URL, and fossil asks for the password and offers to remember it.</p>
+      <pre class="code wide" id="fossilPush"></pre>
+      <p>Every check-in pushed here becomes part of the repository this page shows, so the Timeline below and the download include it.</p>
+    </section>
     <section class="prose" id="r-timeline">
       <h2>Timeline</h2>
       <p>Every check-in that touched the draft, newest first. Each is a manifest: a small text artifact whose cards name the files, the parent and the author, and whose hash is the check-in's name. Choose one to read its manifest.</p>
@@ -1604,6 +1613,12 @@ LF        = %x0A</pre>
     $("#topTitle").textContent = current === "repo" ? fossilNameOf(curKey) : current === "draft" ? `draft-fossil-${r.name}-00` : r.title;
     $("#repoEyebrow").textContent = `${fossilNameOf(curKey)} · running in your browser`;
     $("#downloadRepo").textContent = `Download ${fossilNameOf(curKey)}`;
+    if (HOST === "worker") {
+      const url = `${location.origin}/${r.name}`, login = `${location.protocol}//LOGIN@${location.host}/${r.name}`;
+      $("#fossilClone").textContent = `fossil clone ${url} ${r.name}.fossil\nmkdir ${r.name} && cd ${r.name}\nfossil open ../${r.name}.fossil`;
+      $("#fossilPush").textContent = `fossil remote ${login}\nfossil commit -m "what changed"\nfossil push`;
+      $("#r-fossil").hidden = false;
+    }
     $$("#repo .topic").forEach((sec) => (sec.hidden = sec.dataset.topic !== curKey));
   }
   // Before a repository is open, the draft view shows text rendered at build time.
