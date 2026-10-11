@@ -198,8 +198,8 @@ T -sym-trunk *               cancel the inherited sym-trunk</pre>
   <p>The default branch name is the <code>main-branch</code> setting, or <code>trunk</code> when it is unset. An implementation <span class="req">MUST</span> read the setting and <span class="req">MUST NOT</span> assume a fixed string when one is set (§6.1).</p>
 
   <h3 data-draft="s6-2"><span class="sec">§6.2</span>Creating a branch</h3>
-  <p>A new branch is two propagating cards on its root manifest: <code>*branch</code> with the new name as value, and <code>*sym-&lt;name&gt;</code>. Both propagate under §5, which is how later check-ins inherit the branch (§6.2). The root <span class="req">MUST</span> also cancel the inherited propagating <code>sym-</code> tags with <code>-</code> cards, so it does not carry the parent branch's names alongside its own. The <code>branch new</code> command goes further and cancels every active <code>sym-</code> tag it sees (§6.2).</p>
-  <p>Creation <span class="req">MUST NOT</span> succeed when the name already names an open branch, and the check <span class="req">MUST</span> happen before the root manifest is written. Fossil's own reuse guard is narrower than §9's open-leaf test: it looks for a propagating branch tag with that name and excludes only a singleton closed marker (§6.2).</p>
+  <p>A new branch is two propagating cards on its root manifest: <code>*branch</code> with the new name as value, and <code>*sym-&lt;name&gt;</code>. Both propagate under §5, which is how later check-ins inherit the branch (§6.2). The root <span class="req">MUST</span> also cancel every pre-existing active <code>sym-</code> tag with <code>-</code> cards, so it does not carry the parent branch's names alongside its own (§6.2). Fossil's two ways of branching differ in the detail: <code>commit --branch</code> cancels the inherited propagating tags and <code>branch new</code> the singletons as well, and the root's active tags come out the same either way (see the §6.2 compatibility erratum in the Draft text view).</p>
+  <p>Creation <span class="req">MUST NOT</span> succeed when the name already names an open branch, and the check <span class="req">MUST</span> happen before the root manifest is written (§6.2).</p>
 
   <h3 data-draft="s6-3"><span class="sec">§6.3</span>Listing branches</h3>
   <p>The branch list is derived. Group the <code>tagxref</code> rows where <code>tag.tagname = 'branch'</code> and <code>tagtype &gt; 0</code> by value: each value is a branch, with its greatest <code>event.mtime</code> and the count of its check-ins (§6.3).</p>
@@ -328,7 +328,7 @@ T -sym-trunk *               cancel the inherited sym-trunk</pre>
   <p>Now the open leaf <code>b05cbea82b</code> is older than its closed sibling <code>ee3a7eed71</code>. <code>leaves</code> lists only <code>b05cbea82b</code>; <code>leaves --all</code> lists both, newer first. Yet <code>whatis trunk</code> reports <code>ee3a7eed71</code>, and <code>update trunk</code> moves the checkout from <code>b05cbea82b</code> to <code>ee3a7eed71</code> (§10.2).</p>
 
   <h3 data-draft="s10-3"><span class="sec">§10.3</span>What follows</h3>
-  <p>Tooling that needs the target of <code>update</code> or <code>whatis</code> <span class="req">MUST</span> resolve the name directly, not infer it from <code>leaves</code> output (§10.3).</p>
+  <p>Tooling that infers the target of <code>update</code> or <code>whatis</code> from <code>leaves</code> output alone will diverge when a closed check-in is newer than the open leaves (§10.3).</p>
 </section>
 
 <section class="prose" id="rs-security">
