@@ -13,7 +13,10 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import "../vendor/wasm_exec.js";
 
-const run = promisify(execFile);
+// fossil refuses to clone or commit without knowing who is acting, and a CI
+// runner's environment may carry no USER.
+const execFossil = promisify(execFile);
+const run = (cmd, args, opts = {}) => execFossil(cmd, args, { ...opts, env: { ...process.env, USER: process.env.USER || "ci" } });
 const root = path.join(import.meta.dirname, "..");
 const KEYS = { dl: "delta-format", af: "artifact-format", rs: "repo-state", sp: "sync-protocol" };
 const repoFile = (key) => path.join(root, `rfcs/repos/${key}.fossil`);
