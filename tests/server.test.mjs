@@ -70,7 +70,7 @@ test("stock fossil clones every repository, pushes only with an account, and the
   await run("fossil", ["commit", "-m", "a pushed edit", "--user-override", "editor", "--no-warnings"], { cwd: checkout });
   const output = (r) => `${r.stdout}${r.stderr}`;
   assert.match(output(await run("fossil", ["push", `http://${host}/delta-format`], { cwd: checkout }).catch((e) => e)), /push denied/);
-  assert.match(output(await run("fossil", ["push", `http://editor:wrong@${host}/delta-format`], { cwd: checkout }).catch((e) => e)), /authentication failed/);
+  assert.match(output(await run("fossil", ["push", `http://editor:wrong@${host}/delta-format`], { cwd: checkout }).catch((e) => e)), /login failed/);
   assert.match(output(await run("fossil", ["push", `http://editor:a-test-password@${host}/delta-format`], { cwd: checkout })), /Artifacts sent: [1-9]/);
   await run("fossil", ["close", "--force"], { cwd: checkout });
 

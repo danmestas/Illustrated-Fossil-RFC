@@ -11,6 +11,8 @@ in the Worker secret `FOSSIL_PUSHERS` can push.
 - A release that publishes check-ins the stored repository lacks pulls them
   in.
 - The Repository view says how to clone, pull and push.
+- go-libfossil 0.11.0: a pull-only sync converges when the puller holds
+  artifacts the server lacks, and a login needs a non-empty password.
 
 ## 0.2.0
 
