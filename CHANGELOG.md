@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0
+
+Each draft's repository takes pushes. Anyone can clone and pull; the accounts
+in the Worker secret `FOSSIL_PUSHERS` can push.
+
+- One Durable Object per draft holds its repository and every check-in
+  pushed to it. The Repository view and its download show the repository as
+  it is now.
+- A release that publishes check-ins the stored repository lacks pulls them
+  in.
+- The Repository view says how to clone, pull and push.
+- go-libfossil 0.11.0: a pull-only sync converges when the puller holds
+  artifacts the server lacks, and a login needs a non-empty password.
+
 ## 0.2.0
 
 Each draft's repository can be cloned and pulled with stock `fossil`, from

@@ -14,21 +14,35 @@ State and Sync Protocol — as one site. Each draft has three views:
   every artifact's name, a rebuild of the derived tables, and an animated
   sync between two copies.
 
-Each repository can also be cloned and pulled with stock `fossil`:
+Each repository is also a Fossil server, so stock `fossil` can clone, pull
+and push it:
 
 ```sh
 fossil clone https://illustrated-fossil-rfc.daniel-mestas.workers.dev/delta-format delta.fossil
 ```
 
 The other three are `/artifact-format`, `/repo-state` and `/sync-protocol`.
-They are read-only: a push is refused.
+Anyone can clone and pull. Pushing needs one of the accounts in the Worker
+secret `FOSSIL_PUSHERS`, one `login:password` per line:
+
+```sh
+npx wrangler secret put FOSSIL_PUSHERS
+```
 
 It is served as a Cloudflare Worker, `illustrated-fossil-rfc`. Cloudflare
 serves the built site as static assets. The Worker script
-(`worker/index.js`) answers what no asset does: a sync request to `/NAME` is
-handed to a second go-libfossil program, `wasm/server/main.go`, which
-answers it from a fresh in-memory copy of `repos/NAME.fossil`, so nothing a
-client sends outlives its request.
+(`worker/index.js`) answers the rest. One Durable Object per draft holds its
+repository: it starts as the copy the site publishes, `repos/NAME.fossil`,
+and keeps every check-in pushed to it since. A sync request to `/NAME` is
+answered against that copy by a second go-libfossil program,
+`wasm/server/main.go`, and `GET /repos/NAME.fossil` serves it, so the
+Repository view and its download show what was pushed. When a release
+publishes a repository with check-ins the stored copy lacks, they are pulled
+in. The stored copy never holds a login: the pushers' accounts exist only in
+memory, for the request that uses them.
+
+For `wrangler dev`, put test accounts in `.dev.vars`
+(`FOSSIL_PUSHERS="tester:a-password"`), which is not checked in.
 
 ## Building and testing
 
@@ -58,7 +72,7 @@ binary as base64 text beside it.
 | `delta.js` | Fossil's delta codec, for the playground |
 | `rfcs/repos/*.fossil` | each draft's repository |
 | `wasm/` | the go-libfossil programs the Repository view and the sync server run, and their build |
-| `worker/` | the Worker script: sync requests to the server, everything else to the assets |
+| `worker/` | the Worker script and its Durable Object: each draft's repository as a Fossil server |
 | `vendor/` | Pikchr's WebAssembly build (from pikchr-studio) and Go's `wasm_exec.js` (Go 1.27.1) |
 
 ## The go-libfossil build
