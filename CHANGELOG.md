@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.1
+
+- Fourteen more errata, each checked against Fossil 2.28: two for the
+  artifact format, three for repository state and nine for the sync
+  protocol.
+- The readings follow zit's drafts where the 29 July text they were written
+  against had changed, and keep the 29 July behaviour where Fossil does what
+  it said (those places now have errata).
+
 ## 0.4.0
 
 One Fossil repository, `/rfcs`, holds every draft and every erratum.
