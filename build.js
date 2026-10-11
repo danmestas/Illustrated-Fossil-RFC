@@ -4,7 +4,7 @@
 //
 // worker (the default) writes a site for Cloudflare Workers static assets:
 // index.html, the Pikchr and Go runtimes, the gzipped go-libfossil build and
-// repos/<name>.fossil. artifact writes the claude.ai artifact layout, whose
+// repos/rfcs.fossil. artifact writes the claude.ai artifact layout, whose
 // host serves only web types: delta-format.html with every binary as base64
 // text beside it.
 const fs = require("fs"), zlib = require("zlib"), path = require("path"), { execFileSync } = require("child_process");
@@ -20,6 +20,8 @@ if (!["worker", "artifact"].includes(TARGET) || args.length !== 1) {
 }
 const OUT = path.resolve(process.env.INIT_CWD || process.cwd(), args[0]);
 const KEYS = { dl: "delta-format", af: "artifact-format", rs: "repo-state", sp: "sync-protocol" };
+// The one repository the site serves: every draft and erratum (scripts/build-repo.mjs).
+const REPO = "rfcs/repos/rfcs.fossil";
 const STUDIO = "https://pikchr-studio.daniel-mestas.workers.dev/";
 const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -72,7 +74,7 @@ const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, 
   const codeTerms = JSON.parse(fs.readFileSync("rfcs/code-terms.json", "utf8"));
   const fallback = {};
   for (const [key, name] of Object.entries(KEYS)) {
-    const text = execFileSync("fossil", ["cat", "-R", `rfcs/repos/${key}.fossil`, "-r", "trunk", `draft-fossil-${name}-00.txt`], { encoding: "utf8", maxBuffer: 1 << 26 });
+    const text = execFileSync("fossil", ["cat", "-R", REPO, "-r", "trunk", `draft-fossil-${name}-00.txt`], { encoding: "utf8", maxBuffer: 1 << 26 });
     fallback[key] = rfcRender(text, { codeTerms: codeTerms[key] });
   }
 
@@ -107,12 +109,12 @@ const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, 
     fs.writeFileSync(path.join(OUT, "index.html"), doc);
     fs.copyFileSync("wasm/rfcrepo.wasm.gz", path.join(OUT, "rfcrepo.wasm.gz"));
     fs.mkdirSync(path.join(OUT, "repos"), { recursive: true });
-    for (const [key, name] of Object.entries(KEYS)) fs.copyFileSync(`rfcs/repos/${key}.fossil`, path.join(OUT, "repos", `${name}.fossil`));
+    fs.copyFileSync(REPO, path.join(OUT, "repos", "rfcs.fossil"));
   } else {
     fs.writeFileSync(path.join(OUT, "delta-format.html"), html);
     const b64 = (f) => fs.readFileSync(f).toString("base64").replace(/.{76}/g, "$&\n");
     fs.writeFileSync(path.join(OUT, "rfcrepo-wasm-gz.txt"), b64("wasm/rfcrepo.wasm.gz"));
-    for (const [key, name] of Object.entries(KEYS)) fs.writeFileSync(path.join(OUT, `${name}-fossil.txt`), b64(`rfcs/repos/${key}.fossil`));
+    fs.writeFileSync(path.join(OUT, "rfcs-fossil.txt"), b64(REPO));
   }
   console.log("built", TARGET, "into", OUT + ":", html.length, "bytes;", Object.keys(figs).length, "figures;", rails, "syntax diagrams;", tools.length, "bytes of tools");
 })().catch((e) => { console.error(e.message); process.exit(1); });

@@ -42,11 +42,11 @@
         <li><b>Decide whether to continue.</b> After reading the reply, the client counts the round and applies §3.7. New work drives another round. The server never acknowledges anything.</li>
       </ol>
 
-      <h3 data-draft="s3-1"><span class="sec">§3.1</span>What a round carries</h3>
+      <h3 data-draft="s3-2"><span class="sec">§3.2</span>What a round carries</h3>
       <p>Every request <span class="req">MUST</span> contain <code>pragma client-version</code>, and it <span class="req">MUST</span> come before any card that asks for content, so the server can apply the SHA3 gate (§7.6) when it handles them. A body login comes before it. So does <code>pragma send-private</code> in the first round of a private sync, though later rounds put it after. The first round of a clone sends no login of either kind.</p>
       <p>Push, pull and sync requests repeat <code>push</code>, <code>pull</code> or both in every round. A clone starts with <code>clone 3 1</code>. A request <span class="req">MAY</span> also carry <code>gimme</code>, content, <code>igot</code>, configuration and unversioned cards, and the returned cookie, and it <span class="req">MUST</span> end with a random comment. A normal reply ends with a <code>#&nbsp;timestamp</code> comment. Replies cut short before or during dispatch can leave that comment out.</p>
 
-      <h3 data-draft="s3-1-1"><span class="sec">§3.1.1</span>How the client reads a reply</h3>
+      <h3 data-draft="s3-2"><span class="sec">§3.2</span>How the client reads a reply</h3>
       <p>After undoing the transport encoding, the client takes the reply's cards in order:</p>
       <div class="tbl-wrap"><table>
         <thead><tr><th>Card</th><th>What the client does</th></tr></thead>
@@ -62,9 +62,9 @@
       </table></div>
       <p>When the loop over cards ends, the client counts the round, evaluates §3.7, and only then throws away the state it kept for that round.</p>
 
-      <h3 data-draft="s3-2"><span class="sec">§3.2</span>What each side remembers</h3>
+      <h3 data-draft="s3-1"><span class="sec">§3.1</span>What each side remembers</h3>
       <p>Table 1 of the draft lists the client's state by how long it lasts. The project code, the phantom set and the cookie persist in the repository. The peer's version and date, the clone sequence number, the round number and the unversioned send table last for the session. Some flags live for one round only: whether an <code>igot</code> created a phantom, whether content arrived, which hashes the peer has or lacks, and the unversioned and private counters. Round state is reset when a round starts and kept until §3.7 has been evaluated. The server keeps its repository plus a few things scoped to one request, such as whether it already sent the unversioned catalog.</p>
-      <p>Cards for the next request are collected while the reply is still being read. The file and delta counts that §3.7(b) checks are the content cards collected in that window (§3.2).</p>
+      <p>Cards for the next request are collected while the reply is still being read. The file and delta counts that §3.7(b) checks are the content cards collected in that window (§3.1).</p>
 
       <h3 data-draft="s3-2-1"><span class="sec">§3.2.1</span>The order of cards in a message</h3>
       <pre class="code wide">login USER NONCE SIGNATURE     when named login applies; never in the first clone round

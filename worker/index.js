@@ -1,13 +1,13 @@
-// The Worker in front of the site: each draft's repository as a Fossil
-// server, so a stock client can clone, pull and push it,
+// The Worker in front of the site: the RFCs' repository as a Fossil server,
+// so a stock client can clone, pull and push it,
 //
-//   fossil clone https://illustrated-fossil-rfc.daniel-mestas.workers.dev/delta-format delta.fossil
+//   fossil clone https://illustrated-fossil-rfc.daniel-mestas.workers.dev/rfcs fossil-rfcs.fossil
 //
 // and the site's static assets for everything else.
 //
-// One Durable Object per draft holds its repository: it starts as the copy
-// the site publishes (repos/NAME.fossil among the assets), and keeps every
-// check-in pushed to it since. A POST to /NAME is a sync request, answered
+// A Durable Object per repository holds it: it starts as the copy the site
+// publishes (repos/NAME.fossil among the assets; the site publishes one,
+// rfcs), and keeps every check-in pushed to it since. A POST to /NAME is a sync request, answered
 // against that copy by wasm/server/main.go; GET /repos/NAME.fossil serves the
 // copy, so the page's Repository view and its download show what was pushed.
 // The copy holds no login: the accounts that may push are the Worker secret
@@ -24,6 +24,10 @@ const MAX_REQUEST_BYTES = 8 << 20;
 // Durable Object storage keeps values up to 2 MiB; the repository is stored
 // in chunks well under that.
 const CHUNK_BYTES = 1 << 20;
+// The per-draft repositories the site served before the RFCs moved into one.
+// A sync to any of them is answered with an error naming /rfcs, so a pull from
+// an old clone says where to go.
+const RETIRED = new Set(["delta-format", "artifact-format", "repo-state", "sync-protocol"]);
 
 let server = null;
 
@@ -128,7 +132,20 @@ export class FossilRepo extends DurableObject {
   }
 }
 
-// Hand the request to the draft's Durable Object, naming the draft.
+// A sync reply holding one error card: the compressed container of
+// draft-fossil-sync-protocol Section 4.1, a 4-byte big-endian length of the
+// uncompressed body, then the body in zlib format. TEXT is fossilized.
+async function errorReply(message) {
+  const fossilized = message.replace(/\\/g, "\\\\").replace(/ /g, "\\s").replace(/\n/g, "\\n");
+  const body = new TextEncoder().encode(`error ${fossilized}\n`);
+  const zlib = new Uint8Array(await new Response(new Blob([body]).stream().pipeThrough(new CompressionStream("deflate"))).arrayBuffer());
+  const out = new Uint8Array(4 + zlib.length);
+  new DataView(out.buffer).setUint32(0, body.length);
+  out.set(zlib, 4);
+  return new Response(out, { headers: { "Content-Type": SYNC_TYPE, "Cache-Control": "no-store" } });
+}
+
+// Hand the request to the repository's Durable Object, naming it.
 function toRepo(name, request, env) {
   const stub = env.REPO.get(env.REPO.idFromName(name));
   const headers = new Headers(request.headers);
@@ -146,6 +163,10 @@ export default {
       return toRepo(file[1], request, env);
     }
     const name = path.replace(/^\/+|\/+$/g, "");
+    if (RETIRED.has(name)) {
+      if (request.method !== "POST") return Response.redirect(new URL("/", request.url), 302);
+      return errorReply(`this repository has moved: every draft and erratum is now in one repository, ${new URL("/rfcs", request.url)}`);
+    }
     if (/^[a-z0-9-]+$/.test(name) && (await repoAsset(name, env, "HEAD")).ok) {
       if (request.method !== "POST") {
         // A clone URL opened in a browser: show the site.

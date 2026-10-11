@@ -359,6 +359,20 @@ footer.end { margin-top: 80px; padding-top: 22px; border-top: 1px solid var(--ru
 details.boiler { margin: 24px 0 0; border: 1px solid var(--rule); border-radius: 10px; background: var(--panel); }
 details.boiler summary { cursor: pointer; padding: 10px 16px; font: 500 14px var(--sans); color: var(--muted); }
 details.boiler > div { padding: 4px 18px 8px; }
+/* Errata filed against the draft, read from the repository's erratum/ files. */
+.errata { margin: 0 0 32px; max-width: 74ch; }
+.errata h2 { font: 600 20px/1.3 var(--display); margin: 0 0 6px; }
+.errata > p { font: 15px/1.55 var(--sans); color: var(--muted); margin: 0 0 10px; }
+.errata details { margin: 8px 0 0; border: 1px solid var(--rule); border-radius: 10px; background: var(--panel); }
+.errata summary { cursor: pointer; padding: 10px 16px; font: 14px/1.45 var(--sans); display: grid; gap: 2px; }
+.errata summary b { font-weight: 600; }
+.errata summary span { color: var(--muted); font-size: 13px; }
+.errata .md { padding: 4px 18px 12px; font: 15px/1.6 var(--sans); overflow-x: auto; }
+.errata .md h1, .errata .md h2, .errata .md h3 { font: 600 16px/1.35 var(--sans); margin: 18px 0 6px; }
+.errata .md p, .errata .md li { max-width: none; font: 15px/1.6 var(--sans); }
+.errata .md pre { font: 13px/1.5 var(--mono); background: var(--bg); border-radius: 8px; padding: 10px 12px; overflow-x: auto; }
+.errata .md blockquote { margin: 8px 0; padding-left: 12px; border-left: 1px solid var(--rule); color: var(--muted); }
+.errata .md table { font-size: 14px; margin: 8px 0 14px; }
 @media (max-width: 900px) { .rfc { font-size: 16px; } .rfc .rfc-dl { grid-template-columns: minmax(0, 1fr); } .rfc .rfc-dl dd { margin-bottom: 8px; } }
 /*RFCTABLECSS*/
 </style>
@@ -645,6 +659,11 @@ LF        = %x0A</pre>
       <div class="ietf-head" id="draftHead"></div>
       <p class="lede">The draft's text, unchanged. Headings marked <span class="to-other" style="margin:0;vertical-align:0">Illustrated</span> open the explained version of that section.</p>
     </header>
+    <section class="errata" id="draftErrata" data-nosearch hidden>
+      <h2>Errata</h2>
+      <p id="errataNote"></p>
+      <div id="errataList"></div>
+    </section>
     <div id="draftBody"></div>
   </main>
   <main class="doc" id="repo" hidden>
@@ -662,7 +681,7 @@ LF        = %x0A</pre>
     </header>
     <section class="prose" id="r-fossil" hidden>
       <h2>Clone, pull and push</h2>
-      <p>This site is also a Fossil server for each draft's repository, so stock <code>fossil</code> works against it. Clone the repository and open a working copy:</p>
+      <p>This site is also a Fossil server for the repository, so stock <code>fossil</code> works against it. One repository holds every draft and every erratum. Clone it and open a working copy:</p>
       <pre class="code wide" id="fossilClone"></pre>
       <p>A clone remembers where it came from, so <code>fossil pull</code> in the working copy brings in what has been pushed since.</p>
       <p>Anyone can clone and pull. Pushing needs an account on this server: give your login in the URL, and fossil asks for the password and offers to remember it.</p>
@@ -1067,8 +1086,10 @@ LF        = %x0A</pre>
   let curKey = "dl";
   const CODE_TERMS = JSON.parse(document.getElementById("codeTermsData").textContent);
   const fileOf = (k) => `draft-fossil-${RFCS[k].name}-00.txt`;
-  const repoFileOf = (k) => (HOST === "worker" ? `repos/${RFCS[k].name}.fossil` : `${RFCS[k].name}-fossil.txt`);
-  const fossilNameOf = (k) => `${RFCS[k].name}.fossil`;
+  // One repository holds every draft and erratum; each RFC reads its own draft from it.
+  const REPO_FILE = HOST === "worker" ? "repos/rfcs.fossil" : "rfcs-fossil.txt";
+  const repoFileOf = () => REPO_FILE;
+  const fossilNameOf = () => "fossil-rfcs.fossil";
   const panes = { get doc() { return $("#illus-" + curKey); }, draft: $("#draft"), repo: $("#repo") };
   const rfcOf = (node) => (node && node.closest("[data-rfc]") ? node.closest("[data-rfc]").dataset.rfc : null);
   const viewOf = (node) => (node && node.closest("#draft") ? "draft" : node && node.closest("#repo") ? "repo" : "doc");
@@ -1279,13 +1300,21 @@ LF        = %x0A</pre>
     await new Promise((ready) => { window.onFossilReady = ready; go.run(instance); });
     return window.fossil;
   }
-  // Open one RFC's repository; its state lives in states[key] from then on.
+  // The repository's bytes and SHA-256, fetched once for every RFC.
+  let shared = null;
+  function sharedRepo() {
+    shared ??= (async () => {
+      const bytes = await fetchBytes(REPO_FILE);
+      // The conditional publish needs the stored file's SHA-256: hash it as served.
+      const digest = await crypto.subtle.digest("SHA-256", fetchBytes.body);
+      return { bytes, sha: [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("") };
+    })().catch((err) => { shared = null; throw err; });
+    return shared;
+  }
+  // Open the repository for one RFC; that RFC's state lives in states[key] from then on.
   const states = {};
   async function openRepo(key) {
-    const bytes = await fetchBytes(repoFileOf(key));
-    // The conditional publish needs the stored file's SHA-256: hash it as served.
-    const digest = await crypto.subtle.digest("SHA-256", fetchBytes.body);
-    const sha = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    const { bytes, sha } = await sharedRepo();
     const info = P(api.open(key, bytes.slice()));
     states[key] = { repoBytes: bytes, originalRepoBytes: bytes.slice(), repoSha: sha, repoInfo: info, pendingText: null };
     const tool = (window.RFC_TOOLS || {})[key];
@@ -1586,6 +1615,15 @@ LF        = %x0A</pre>
       if (res && res.shas && res.shas[path]) repoSha = res.shas[path];
       repoBytes = b64bytes(ex.base64); originalRepoBytes = repoBytes.slice();
       Object.assign(states[curKey], { repoBytes, originalRepoBytes, repoSha });
+      // Every RFC reads the same repository: reopen the others from the new bytes,
+      // so a later commit from any of them builds on this one.
+      shared = Promise.resolve({ bytes: repoBytes, sha: repoSha });
+      for (const k of Object.keys(states)) {
+        if (k === curKey) continue;
+        P(api.open(k, repoBytes.slice()));
+        Object.assign(states[k], { repoBytes, originalRepoBytes: repoBytes.slice(), repoSha });
+      }
+      api.use(curKey);
       pendingText = null; clearStash(); $("#commitMsg").value = "";
       refreshRepo();
       note.textContent = `Committed ${short(made.uuid)} and published. Everyone with this page open moves to it.`;
@@ -1614,8 +1652,8 @@ LF        = %x0A</pre>
     $("#repoEyebrow").textContent = `${fossilNameOf(curKey)} · running in your browser`;
     $("#downloadRepo").textContent = `Download ${fossilNameOf(curKey)}`;
     if (HOST === "worker") {
-      const url = `${location.origin}/${r.name}`, login = `${location.protocol}//LOGIN@${location.host}/${r.name}`;
-      $("#fossilClone").textContent = `fossil clone ${url} ${r.name}.fossil\nmkdir ${r.name} && cd ${r.name}\nfossil open ../${r.name}.fossil`;
+      const url = `${location.origin}/rfcs`, login = `${location.protocol}//LOGIN@${location.host}/rfcs`;
+      $("#fossilClone").textContent = `fossil clone ${url} fossil-rfcs.fossil\nmkdir fossil-rfcs && cd fossil-rfcs\nfossil open ../fossil-rfcs.fossil`;
       $("#fossilPush").textContent = `fossil remote ${login}\nfossil commit -m "what changed"\nfossil push`;
       $("#r-fossil").hidden = false;
     }
@@ -2055,6 +2093,74 @@ LF        = %x0A</pre>
     ].map(([k, val]) => { const s = el("span"); s.append(`${k} `, el("b", null, String(val))); return s; }));
   }
   let repoInfo = null;
+  // A small Markdown renderer for the errata: headings, paragraphs, lists,
+  // tables, fenced code, quotes, and inline code, bold, emphasis and links.
+  function md(src) {
+    const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const inline = (t) => esc(t)
+      .replace(/`([^`]+)`/g, (_, c) => `<code>${c}</code>`)
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, "$1<em>$2</em>")
+      .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    const lines = src.replace(/\r/g, "").split("\n"), out = [];
+    for (let i = 0; i < lines.length; ) {
+      const l = lines[i];
+      if (/^```/.test(l)) {
+        const body = [];
+        for (i++; i < lines.length && !/^```/.test(lines[i]); i++) body.push(lines[i]);
+        i++;
+        out.push(`<pre>${esc(body.join("\n"))}</pre>`);
+      } else if (/^#{1,6} /.test(l)) {
+        const n = l.match(/^#+/)[0].length;
+        out.push(`<h${Math.min(n, 3)}>${inline(l.slice(n + 1))}</h${Math.min(n, 3)}>`); i++;
+      } else if (/^\|/.test(l)) {
+        const rows = [];
+        for (; i < lines.length && /^\|/.test(lines[i]); i++) rows.push(lines[i].replace(/^\||\|$/g, "").split("|").map((c) => c.trim()));
+        const sep = rows.length > 1 && rows[1].every((c) => /^:?-+:?$/.test(c));
+        const head = sep ? rows[0] : null, body = sep ? rows.slice(2) : rows;
+        out.push(`<div class="tbl-wrap"><table>${head && head.some(Boolean) ? `<thead><tr>${head.map((c) => `<th>${inline(c)}</th>`).join("")}</tr></thead>` : ""}<tbody>${body.map((r) => `<tr>${r.map((c) => `<td>${inline(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`);
+      } else if (/^\s*([-*]|\d+\.) /.test(l)) {
+        const ordered = /^\s*\d+\. /.test(l), items = [];
+        for (; i < lines.length && /^\s*([-*]|\d+\.) /.test(lines[i]); i++) {
+          let item = lines[i].replace(/^\s*([-*]|\d+\.) /, "");
+          for (; i + 1 < lines.length && /^\s{2,}\S/.test(lines[i + 1]) && !/^\s*([-*]|\d+\.) /.test(lines[i + 1]); i++) item += " " + lines[i + 1].trim();
+          items.push(`<li>${inline(item)}</li>`);
+        }
+        out.push(ordered ? `<ol class="plain">${items.join("")}</ol>` : `<ul class="plain">${items.join("")}</ul>`);
+      } else if (/^> ?/.test(l)) {
+        const q = [];
+        for (; i < lines.length && /^> ?/.test(lines[i]); i++) q.push(lines[i].replace(/^> ?/, ""));
+        out.push(`<blockquote>${md(q.join("\n"))}</blockquote>`);
+      } else if (/^---+$/.test(l.trim()) || !l.trim()) {
+        i++;
+      } else {
+        const p = [];
+        for (; i < lines.length && lines[i].trim() && !/^(```|#{1,6} |\||> ?|\s*([-*]|\d+\.) |---+$)/.test(lines[i]); i++) p.push(lines[i].trim());
+        out.push(`<p>${inline(p.join(" "))}</p>`);
+      }
+    }
+    return out.join("");
+  }
+
+  // The errata filed against the current draft: erratum/NAME-00-*.md at the tip.
+  function renderErrata() {
+    const prefix = `erratum/${RFCS[curKey].name}-00-`, list = $("#errataList");
+    let files = [];
+    try { files = P(api.files(tipUuid())).filter((f) => f.Name.startsWith(prefix)).map((f) => f.Name).sort(); } catch { files = []; }
+    $("#draftErrata").hidden = files.length === 0;
+    list.textContent = "";
+    if (!files.length) return;
+    $("#errataNote").textContent = `${files.length} ${files.length === 1 ? "erratum is" : "errata are"} filed against this draft, as files in the repository's erratum/ directory. The text below them is the draft as published; the errata are not applied to it.`;
+    for (const name of files) {
+      const text = P(api.read(tipUuid(), name)).text;
+      const field = (k) => { const m = text.match(new RegExp(`^\\|\\s*\\*\\*${k}\\*\\*\\s*\\|\\s*(.+?)\\s*\\|\\s*$`, "m")); return m ? m[1].replace(/`/g, "") : ""; };
+      const d = el("details"), sum = el("summary"), body = el("div");
+      sum.append(el("b", null, `§${field("Section") || name.slice(prefix.length).replace(/\.md$/, "")}`), el("span", null, [field("Status"), field("Type")].filter(Boolean).join(" · ")));
+      body.className = "md"; body.innerHTML = md(text);
+      d.append(sum, body); list.append(d);
+    }
+  }
+
   function refreshRepo() {
     texts.clear(); maps.clear();
     checkins = P(api.timeline());
@@ -2073,6 +2179,7 @@ LF        = %x0A</pre>
     });
     $$("#modeSeg button").forEach((b) => (b.disabled = false));
     viewing = tipUuid();
+    renderErrata();
     annotations = annotateSafe(viewing);
     renderDraft();
     renderTimeline(); renderDiff(); renderStorage(); renderFacts(repoInfo);

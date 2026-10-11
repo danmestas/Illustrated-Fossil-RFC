@@ -1,4 +1,4 @@
-// The go-libfossil build the page runs, against the four repositories it ships.
+// The go-libfossil build the page runs, against the repository it ships.
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -13,24 +13,34 @@ const { instance } = await WebAssembly.instantiate(wasm, go.importObject);
 await new Promise((ready) => { globalThis.onFossilReady = ready; go.run(instance); });
 const fossil = globalThis.fossil, P = JSON.parse;
 const KEYS = { dl: "delta-format", af: "artifact-format", rs: "repo-state", sp: "sync-protocol" };
+const repo = () => new Uint8Array(fs.readFileSync(path.join(root, "rfcs/repos/rfcs.fossil")));
+
+test("the repository opens, verifies, and every artifact matches its name", () => {
+  const info = P(fossil.open("rfcs", repo()));
+  assert.equal(info.projectName, "fossil-rfcs");
+  assert.equal(P(fossil.verify()).ok, true);
+  const names = P(fossil.nameCheck());
+  assert.ok(names.length > 0);
+  for (const a of names) assert.equal(a.ok, true, `${a.uuid} does not match its bytes`);
+  for (const a of names.filter((x) => x.zcard)) assert.equal(a.zcard, a.zcheck, `${a.uuid}: Z card`);
+});
 
 for (const [key, name] of Object.entries(KEYS)) {
-  test(`${name}: opens, verifies, and every artifact matches its name`, () => {
-    const info = P(fossil.open(key, new Uint8Array(fs.readFileSync(path.join(root, `rfcs/repos/${key}.fossil`)))));
-    assert.equal(info.projectName, `draft-fossil-${name}`);
-    assert.equal(P(fossil.verify()).ok, true);
+  test(`${name}: the draft is at the tip, with a history, and its errata beside it`, () => {
+    fossil.open(key, repo());
     const timeline = P(fossil.timeline());
-    assert.ok(timeline.length >= 2, "the draft has a history");
-    const names = P(fossil.nameCheck());
-    assert.ok(names.length > 0);
-    for (const a of names) assert.equal(a.ok, true, `${a.uuid} does not match its bytes`);
-    for (const a of names.filter((x) => x.zcard)) assert.equal(a.zcard, a.zcheck, `${a.uuid}: Z card`);
+    const file = `draft-fossil-${name}-00.txt`;
+    const touched = timeline.filter((ci) => P(fossil.files(ci.uuid)).some((f) => f.Name === file));
+    assert.ok(touched.length >= 2, "the draft has a history");
+    assert.match(P(fossil.read(timeline[0].uuid, file)).text, new RegExp(`draft-fossil-${name}-00`));
+    const errata = P(fossil.files(timeline[0].uuid)).filter((f) => f.Name.startsWith(`erratum/${name}-00-`));
+    for (const e of errata) assert.match(P(fossil.read(timeline[0].uuid, e.Name)).text, /^# (Technical )?[Ee]rratum/);
   });
 }
 
 for (const kind of ["pull", "push"]) {
   test(`a ${kind} between two copies converges`, () => {
-    fossil.open("sp", new Uint8Array(fs.readFileSync(path.join(root, "rfcs/repos/sp.fossil"))));
+    fossil.open("rfcs", repo());
     const s = P(fossil.syncDemo(kind));
     assert.ok(s.rounds.length >= 2);
     const ids = (side) => s.after[side].map((a) => a.uuid).sort();

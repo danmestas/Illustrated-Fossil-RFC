@@ -94,7 +94,7 @@
             "igot 393953a9803595823fb560ddbe333767840a5ad89748a12fc2cd00f533c6df8a 1",
             "igot da4b6b0ea2b060ff6bf29c16a3b10be05afc9c1a75d605a45cf7267ea3e74091 1",
             "# timestamp 2026-07-02T18:34:48 errors 0"]),
-          note: "The first private round puts send-private before client-version (§3.1). The user holds x, so the server announces its two private artifacts with igot HASH 1 next to the public ones (§7.5, §9.5).",
+          note: "The first private round puts send-private before client-version (§3.2). The user holds x, so the server announces its two private artifacts with igot HASH 1 next to the public ones (§7.5, §9.5).",
         },
         {
           request: lines([
@@ -189,7 +189,7 @@
   function explainPragma(t, dir) {
     const name = t[1] || "";
     switch (name) {
-      case "client-version": return ["§9.1", `Client release ${t[2]} (Fossil ${release(t[2])})${t[3] ? `, built ${t[3]} ${t[4] || ""}` : ""}. Every request carries it, before any card that asks for content (§3.1).`];
+      case "client-version": return ["§9.1", `Client release ${t[2]} (Fossil ${release(t[2])})${t[3] ? `, built ${t[3]} ${t[4] || ""}` : ""}. Every request carries it, before any card that asks for content (§3.2).`];
       case "server-version": return ["§9.1", `Server release ${t[2]} (Fossil ${release(t[2])}). It sets the client's SHA3 (§7.6), private-igot (§8.6) and cookie-login (§6.5) gates.`];
       case "send-private": return ["§9.5", "Asks for private content. It works only for a caller with capability x."];
       case "send-catalog": return ["§9.5", "Asks the server to announce every eligible artifact it holds."];
@@ -224,7 +224,7 @@
       case "pull": case "push":
         return dir === "req"
           ? ["§8.5", `${op === "pull" ? "Pull" : "Push"} with servercode and projectcode. ${op === "pull" ? "The server's igot cards become phantoms here." : "The client's igot cards become phantoms on the server."}`]
-          : ["§3.1.1", `The server's servercode and projectcode. ${op === "push" ? "A clone reissue needs a well-formed push in the reply (§8.2)." : ""}`];
+          : ["§3.2", `The server's servercode and projectcode. ${op === "push" ? "A clone reissue needs a well-formed push in the reply (§8.2)." : ""}`];
       case "clone": return ["§8.1", `Clone version ${t[1]}, starting at blob RID ${t[2]} (§8.2).${t[2] === "1" ? " The first clone request carries no login (§8.3)." : ""}`];
       case "clone_seqno": return ["§8.2", t[1] === "0" ? "0: the server has nothing more to send. Clone cards are barred for the rest of the session." : `Next RID to ask for. The client records it and may reissue clone 3 ${t[1]}.`];
       case "igot": {
@@ -235,7 +235,7 @@
       }
       case "gimme": return dir === "req"
         ? ["§3.3", "Asks for the content of a phantom."]
-        : ["§3.3", "The server lacks this. With push on, the client appends the content to its next request (§3.1.1)."];
+        : ["§3.3", "The server lacks this. With push on, the client appends the content to its next request (§3.2)."];
       case "file": {
         const delta = pv(2);
         return ["§7.1", delta ? `Delta against ${short(delta)}, ${t[3]} bytes. A missing source becomes a phantom (§7.4).` : `Full content, ${t[2]} bytes. Storing it deletes the phantom (§3.3).`];
@@ -386,7 +386,7 @@
           parts.push(`This reply carried ${kinds.length ? kinds.join(", ") : "no content or igot"} card${total === 1 ? "" : "s"}${seq ? `, and clone_seqno ${seq.tok[1]}` : ""}.`);
           const isClone = req.some((x) => x.kind === "card" && x.op === "clone");
           if (isClone && count("file")) parts.push("§7.1 says clone 3 server transfer uses cfile, not file; this reply also carries file cards.");
-          if (!req.length || req[req.length - 1].kind !== "comment") parts.push("The request does not end with the random comment that §3.1 and §5.3 require.");
+          if (!req.length || req[req.length - 1].kind !== "comment") parts.push("The request does not end with the random comment that §3.2 and §5.3 require.");
           if (k === 0 && count("error")) parts.push("Errors in the first clone reply are ignored as errors, and a second request is mandatory (§8.3).");
           const next = rounds[k + 1];
           if (next) {
