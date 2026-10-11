@@ -1,11 +1,16 @@
 {
-  // Assets-only Worker: Cloudflare serves the built site directly, no script.
-  // `wrangler deploy` runs the build first, into dist/.
+  // The built site is served as static assets. The Worker script runs for
+  // whatever no asset answers, which includes a sync request to /NAME: it
+  // serves Fossil's sync protocol for repos/NAME.fossil (worker/index.js).
+  // `wrangler deploy` runs the build first: the site into dist/, and the
+  // sync server's WebAssembly into worker/.
   "name": "illustrated-fossil-rfc",
+  "main": "worker/index.js",
   "compatibility_date": "2026-09-28",
-  "build": { "command": "node build.js dist" },
+  "build": { "command": "node build.js dist && node worker/unpack.js" },
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
     "not_found_handling": "404-page"
   },
   "observability": {

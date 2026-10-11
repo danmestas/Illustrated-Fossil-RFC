@@ -43,5 +43,10 @@ for pair in "${RFCS[@]}"; do
     echo "$key  $when  revision from fossil-rfc"
   fi
   (cd "$work" && fossil close --force >/dev/null 2>&1 || true); rm -rf "$work"
+  # The repositories are published and served, so no account may log in to
+  # them: clear every password and capability but nobody's. Clearing the
+  # capabilities too matters because go-libfossil's sync login accepts an
+  # empty stored password, where fossil refuses one.
+  fossil sqlite3 -R "$repo" "UPDATE user SET pw='', cap='' WHERE login<>'nobody'; VACUUM;" </dev/null
   fossil test-integrity -R "$repo" 2>&1 | tail -1 | sed "s/^/$key  /"
 done
