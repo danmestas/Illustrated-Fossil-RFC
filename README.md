@@ -6,22 +6,22 @@ State and Sync Protocol — as one site. Each draft has three views:
 - **Illustrated**: a reading of the draft, section by section, with Pikchr
   figures and small tools (a delta playground, an artifact inspector, a sync
   replay).
-- **Draft text**: the draft itself, rendered from its repository's tip, with
-  tables, code literals, syntax diagrams for every ABNF block, and what each
-  version changed.
-- **Repository**: the draft's Fossil repository, opened in the browser by
+- **Draft text**: the draft itself, rendered from the repository's tip, with
+  tables, code literals, syntax diagrams for every ABNF block, what each
+  version changed, and the errata filed against it.
+- **Repository**: the Fossil repository, opened in the browser by
   go-libfossil compiled to WebAssembly: its timeline and storage, a check of
   every artifact's name, a rebuild of the derived tables, and an animated
   sync between two copies.
 
-Each repository is also a Fossil server, so stock `fossil` can clone, pull
-and push it:
+One Fossil repository holds every draft and every erratum, with their real
+history. It is also a Fossil server, so stock `fossil` can clone, pull and
+push it:
 
 ```sh
-fossil clone https://illustrated-fossil-rfc.daniel-mestas.workers.dev/delta-format delta.fossil
+fossil clone https://illustrated-fossil-rfc.daniel-mestas.workers.dev/rfcs fossil-rfcs.fossil
 ```
 
-The other three are `/artifact-format`, `/repo-state` and `/sync-protocol`.
 Anyone can clone and pull. Pushing needs one of the accounts in the Worker
 secret `FOSSIL_PUSHERS`, one `login:password` per line:
 
@@ -29,17 +29,20 @@ secret `FOSSIL_PUSHERS`, one `login:password` per line:
 npx wrangler secret put FOSSIL_PUSHERS
 ```
 
+The site once served one repository per draft, at `/delta-format`,
+`/artifact-format`, `/repo-state` and `/sync-protocol`. Those URLs now answer
+a sync with an error naming `/rfcs`.
+
 It is served as a Cloudflare Worker, `illustrated-fossil-rfc`. Cloudflare
 serves the built site as static assets. The Worker script
-(`worker/index.js`) answers the rest. One Durable Object per draft holds its
-repository: it starts as the copy the site publishes, `repos/NAME.fossil`,
-and keeps every check-in pushed to it since. A sync request to `/NAME` is
-answered against that copy by a second go-libfossil program,
-`wasm/server/main.go`, and `GET /repos/NAME.fossil` serves it, so the
-Repository view and its download show what was pushed. When a release
-publishes a repository with check-ins the stored copy lacks, they are pulled
-in. The stored copy never holds a login: the pushers' accounts exist only in
-memory, for the request that uses them.
+(`worker/index.js`) answers the rest. A Durable Object holds the repository:
+it starts as the copy the site publishes, `repos/rfcs.fossil`, and keeps
+every check-in pushed to it since. A sync request to `/rfcs` is answered
+against that copy by a second go-libfossil program, `wasm/server/main.go`,
+and `GET /repos/rfcs.fossil` serves it, so the page and its download show
+what was pushed. When a release publishes check-ins the stored copy lacks,
+they are pulled in. The stored copy never holds a login: the pushers'
+accounts exist only in memory, for the request that uses them.
 
 For `wrangler dev`, put test accounts in `.dev.vars`
 (`FOSSIL_PUSHERS="tester:a-password"`), which is not checked in.
@@ -47,7 +50,7 @@ For `wrangler dev`, put test accounts in `.dev.vars`
 ## Building and testing
 
 Node 22 or later, and `fossil` on the PATH (the build reads each draft from
-its repository).
+the repository).
 
 ```sh
 npm test              # build checks, renderer, syntax diagrams, delta codec, go-libfossil, sync server
@@ -70,9 +73,9 @@ binary as base64 text beside it.
 | `rfc-render.js`, `rfcs/code-terms.*`, `rfcs/rfc-table.css` | the draft-text renderer and its code literals |
 | `railroad.js` | ABNF to Pikchr syntax diagrams |
 | `delta.js` | Fossil's delta codec, for the playground |
-| `rfcs/repos/*.fossil` | each draft's repository |
+| `rfcs/repos/rfcs.fossil` | the repository: every draft and erratum, built by `scripts/build-repo.mjs` |
 | `wasm/` | the go-libfossil programs the Repository view and the sync server run, and their build |
-| `worker/` | the Worker script and its Durable Object: each draft's repository as a Fossil server |
+| `worker/` | the Worker script and its Durable Object: the repository as a Fossil server |
 | `vendor/` | Pikchr's WebAssembly build (from pikchr-studio) and Go's `wasm_exec.js` (Go 1.27.1) |
 
 ## The go-libfossil build
@@ -91,14 +94,23 @@ With Go 1.27.1 the results are byte for byte the committed files.
 
 ## The repositories
 
-`scripts/build-repos.sh` rebuilds `rfcs/repos/*.fossil` from zit's own
-history: every distinct version of each draft, with its original check-in
-date, author and comment, then the 29 July 2026 revision from
-`~/fossil-rfc`.
+`node scripts/build-repo.mjs` rebuilds `rfcs/repos/rfcs.fossil`. zit is the
+authoritative home of the drafts and errata (`docs/rfcs/` in zit's
+repository); the build replays their history:
 
-Every repository is published and served, so the build clears every
+1. the original drafts in `~/fossil-rfc`'s repository, from before zit took
+   them over;
+2. zit's history of `docs/rfcs/draft-fossil-*.txt` and `docs/rfcs/erratum/*`.
+
+Each distinct version of a file is committed once, with the date, author and
+comment of the check-in that introduced it. Drafts sit at the repository's
+root and errata under `erratum/`. The project code is fixed, so a rebuild is
+the same project: existing clones keep pulling, and the Worker's stored copy
+merges it in.
+
+The repository is published and served, so the build clears every
 account's password and capabilities but `nobody`'s: no one can log in to
-them, and `nobody` can clone and pull but not push.
+it, and `nobody` can clone and pull but not push.
 
 ## Releases
 

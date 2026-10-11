@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0
+
+One Fossil repository, `/rfcs`, holds every draft and every erratum.
+
+- Its history replays zit's, which is authoritative for the drafts, from the
+  original drafts before zit onward. The drafts are now zit's text.
+- The Draft text view lists the errata filed against each draft.
+- The per-draft repositories at `/delta-format`, `/artifact-format`,
+  `/repo-state` and `/sync-protocol` are retired: a sync to them answers with
+  an error naming `/rfcs`.
+- The sync and repo-state readings cite zit's section numbers.
+
 ## 0.3.1
 
 - go-libfossil 0.11.1: the sync server sends content only to a client that

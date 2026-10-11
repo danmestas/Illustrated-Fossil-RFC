@@ -332,16 +332,16 @@ T -sym-trunk *               cancel the inherited sym-trunk</pre>
 </section>
 
 <section class="prose" id="rs-security">
-  <h2 data-draft="s11"><span class="sec">§11</span>Security considerations</h2>
+  <h2 data-draft="s12"><span class="sec">§12</span>Security considerations</h2>
   <ul class="plain">
-    <li>Crosslink state is computed locally and is never transmitted, negotiated or authenticated on its own. Tag and parent claims are whatever the artifact's producer asserted, so the state is only as trustworthy as the artifacts admitted (§11).</li>
-    <li>Implementations <span class="req">MUST</span> treat it as derived data with no trust of its own, and <span class="req">MUST NOT</span> give a tag or parent claim more weight than artifact admission already gave it. Crosslink state from an artifact that admission would reject <span class="req">MUST</span> be rejected or discarded (§11).</li>
-    <li>The trust boundary is artifact admission, so the draft adds no separate mechanism. Weak admission checks weaken the derived view; correct ones bound it (§11).</li>
-    <li>Implementations <span class="req">SHOULD</span> recompute the state from the admitted artifacts instead of caching it across changes, so a rejected or retracted artifact drops out without separate revocation logic (§11).</li>
+    <li>Crosslink state is computed locally and is never transmitted, negotiated or authenticated on its own. Tag and parent claims are whatever the artifact's producer asserted, so the state is only as trustworthy as the artifacts admitted (§12).</li>
+    <li>Implementations <span class="req">MUST</span> treat it as derived data with no trust of its own, and <span class="req">MUST NOT</span> give a tag or parent claim more weight than artifact admission already gave it. Crosslink state from an artifact that admission would reject <span class="req">MUST</span> be rejected or discarded (§12).</li>
+    <li>The trust boundary is artifact admission, so the draft adds no separate mechanism. Weak admission checks weaken the derived view; correct ones bound it (§12).</li>
+    <li>Implementations <span class="req">SHOULD</span> recompute the state from the admitted artifacts instead of caching it across changes, so a rejected or retracted artifact drops out without separate revocation logic (§12).</li>
   </ul>
 </section>
 
 <section class="prose" id="rs-iana">
-  <h2 data-draft="s12"><span class="sec">§12</span>IANA considerations</h2>
-  <p>None (§12).</p>
+  <h2 data-draft="s11"><span class="sec">§11</span>IANA considerations</h2>
+  <p>None (§11).</p>
 </section>

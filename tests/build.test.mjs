@@ -18,7 +18,7 @@ test("the worker build serves the binaries as they are", () => {
   assert.match(html, /^<!doctype html>/);
   assert.match(html, /const HOST = "worker";/);
   for (const f of ["pikchr.js", "pikchr.wasm", "wasm_exec.js", "rfcrepo.wasm.gz",
-    "repos/delta-format.fossil", "repos/artifact-format.fossil", "repos/repo-state.fossil", "repos/sync-protocol.fossil"]) {
+    "repos/rfcs.fossil"]) {
     assert.ok(fs.statSync(path.join(out, f)).size > 0, f);
   }
   // Workers static assets refuse files over 25 MiB.
@@ -30,7 +30,7 @@ test("the artifact build ships every binary as base64 text", () => {
   const out = build("artifact");
   const html = fs.readFileSync(path.join(out, "delta-format.html"), "utf8");
   assert.match(html, /const HOST = "artifact";/);
-  for (const f of ["rfcrepo-wasm-gz.txt", "delta-format-fossil.txt", "sync-protocol-fossil.txt"]) {
+  for (const f of ["rfcrepo-wasm-gz.txt", "rfcs-fossil.txt"]) {
     assert.match(fs.readFileSync(path.join(out, f), "utf8").slice(0, 200), /^[A-Za-z0-9+/=\n]+$/);
   }
   fs.rmSync(out, { recursive: true });
