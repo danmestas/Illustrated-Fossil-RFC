@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.0
+
+- The artifact-format, repo-state and sync-protocol pages show the -01
+  revisions of the drafts, which fold every erratum into the text; the
+  readings' section numbers are unchanged.
+- The Draft text view no longer lists errata, since the text it shows has
+  them applied. The erratum files stay in the repository's history, and the
+  -00 texts stay beside the -01 texts.
+- The repository gains the -01 drafts and six further errata, all applied.
+
 ## 0.4.1
 
 - Fourteen more errata, each checked against Fossil 2.28: two for the

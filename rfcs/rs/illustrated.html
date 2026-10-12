@@ -1,5 +1,5 @@
 <header class="hero">
-  <div class="eyebrow">draft-fossil-repo-state-00 · an illustrated reading</div>
+  <div class="eyebrow">draft-fossil-repo-state-01 · an illustrated reading</div>
   <h1>Fossil Repository State</h1>
   <p class="lede">A Fossil repository stores only immutable artifacts. Branches, tags, leaves, closed markers and the current trunk are not written down anywhere: every repository computes them from the artifacts it holds. This reading walks through those rules and shows each derived table beside the section that defines it, read from this draft's own repository.</p>
 </header>
@@ -198,7 +198,7 @@ T -sym-trunk *               cancel the inherited sym-trunk</pre>
   <p>The default branch name is the <code>main-branch</code> setting, or <code>trunk</code> when it is unset. An implementation <span class="req">MUST</span> read the setting and <span class="req">MUST NOT</span> assume a fixed string when one is set (§6.1).</p>
 
   <h3 data-draft="s6-2"><span class="sec">§6.2</span>Creating a branch</h3>
-  <p>A new branch is two propagating cards on its root manifest: <code>*branch</code> with the new name as value, and <code>*sym-&lt;name&gt;</code>. Both propagate under §5, which is how later check-ins inherit the branch (§6.2). The root <span class="req">MUST</span> also cancel every pre-existing active <code>sym-</code> tag with <code>-</code> cards, so it does not carry the parent branch's names alongside its own (§6.2). Fossil's two ways of branching differ in the detail: <code>commit --branch</code> cancels the inherited propagating tags and <code>branch new</code> the singletons as well, and the root's active tags come out the same either way (see the §6.2 compatibility erratum in the Draft text view).</p>
+  <p>A new branch is two propagating cards on its root manifest: <code>*branch</code> with the new name as value, and <code>*sym-&lt;name&gt;</code>. Both propagate under §5, which is how later check-ins inherit the branch (§6.2). The root <span class="req">MUST</span> also cancel, with <code>-</code> cards, every <code>sym-</code> tag the root would otherwise inherit from its parent, so it does not carry the parent branch's names alongside its own (§6.2). Fossil's two ways of branching differ in the detail: <code>commit --branch</code> cancels the inherited propagating tags and <code>branch new</code> the singletons as well, and the root's active tags come out the same either way (§6.2's informative paragraph).</p>
   <p>Creation <span class="req">MUST NOT</span> succeed when the name already names an open branch, and the check <span class="req">MUST</span> happen before the root manifest is written (§6.2).</p>
 
   <h3 data-draft="s6-3"><span class="sec">§6.3</span>Listing branches</h3>
