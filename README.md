@@ -8,14 +8,15 @@ State and Sync Protocol — as one site. Each draft has three views:
   replay).
 - **Draft text**: the draft itself, rendered from the repository's tip, with
   tables, code literals, syntax diagrams for every ABNF block, what each
-  version changed, and the errata filed against it.
+  version changed. The artifact-format, repo-state and sync-protocol pages
+  show the -01 revisions, which folded every erratum into the text.
 - **Repository**: the Fossil repository, opened in the browser by
   go-libfossil compiled to WebAssembly: its timeline and storage, a check of
   every artifact's name, a rebuild of the derived tables, and an animated
   sync between two copies.
 
-One Fossil repository holds every draft and every erratum, with their real
-history. It is also a Fossil server, so stock `fossil` can clone, pull and
+One Fossil repository holds every draft, the errata the -01 revisions
+folded in, and their real history. It is also a Fossil server, so stock `fossil` can clone, pull and
 push it:
 
 ```sh

@@ -20,6 +20,8 @@ if (!["worker", "artifact"].includes(TARGET) || args.length !== 1) {
 }
 const OUT = path.resolve(process.env.INIT_CWD || process.cwd(), args[0]);
 const KEYS = { dl: "delta-format", af: "artifact-format", rs: "repo-state", sp: "sync-protocol" };
+// The revision of each draft the site shows; -01 folded the errata in.
+const REVS = { dl: "00", af: "01", rs: "01", sp: "01" };
 // The one repository the site serves: every draft and erratum (scripts/build-repo.mjs).
 const REPO = "rfcs/repos/rfcs.fossil";
 const STUDIO = "https://pikchr-studio.daniel-mestas.workers.dev/";
@@ -55,7 +57,7 @@ const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, 
   for (const key of ["af", "rs", "sp"]) {
     const dir = `rfcs/${key}`;
     let frag = fs.existsSync(`${dir}/illustrated.html`) ? fs.readFileSync(`${dir}/illustrated.html`, "utf8")
-      : `<header class="hero"><div class="eyebrow">draft-fossil-${KEYS[key]}-00</div><h1>${KEYS[key]}</h1><p class="lede">This reading is being written. The Draft text and Repository views are complete.</p></header>`;
+      : `<header class="hero"><div class="eyebrow">draft-fossil-${KEYS[key]}-${REVS[key]}</div><h1>${KEYS[key]}</h1><p class="lede">This reading is being written. The Draft text and Repository views are complete.</p></header>`;
     const caps = fs.existsSync(`${dir}/figures.json`) ? JSON.parse(fs.readFileSync(`${dir}/figures.json`, "utf8")) : {};
     frag = frag.replace(/<!--FIG:([\w-]+)-->/g, (_, id) => {
       const name = id.startsWith(key + "-") ? id.slice(key.length + 1) : id;
@@ -74,7 +76,7 @@ const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, 
   const codeTerms = JSON.parse(fs.readFileSync("rfcs/code-terms.json", "utf8"));
   const fallback = {};
   for (const [key, name] of Object.entries(KEYS)) {
-    const text = execFileSync("fossil", ["cat", "-R", REPO, "-r", "trunk", `draft-fossil-${name}-00.txt`], { encoding: "utf8", maxBuffer: 1 << 26 });
+    const text = execFileSync("fossil", ["cat", "-R", REPO, "-r", "trunk", `draft-fossil-${name}-${REVS[key]}.txt`], { encoding: "utf8", maxBuffer: 1 << 26 });
     fallback[key] = rfcRender(text, { codeTerms: codeTerms[key] });
   }
 
