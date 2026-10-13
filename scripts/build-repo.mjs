@@ -5,8 +5,11 @@
 //   1. The original drafts in ~/fossil-rfc's repository, from before zit took
 //      them over: every version of a top-level draft-fossil-*.txt checked in
 //      before zit's first draft import.
-//   2. zit's history of docs/rfcs/draft-fossil-*.txt and docs/rfcs/erratum/*,
-//      which is authoritative from then on.
+//   2. zit's history of docs/rfcs/draft-fossil-*-00.txt and docs/rfcs/erratum/*,
+//      which is authoritative from then on. Each draft is one file whose
+//      text advances revision by revision, so the -01 texts that zit kept
+//      as separate files for a day are left out: their every version is a
+//      version of the -00 file.
 //
 // Each distinct version of a file is committed once, with the date, user and
 // comment of the earliest check-in that introduced it; versions introduced by
@@ -53,7 +56,7 @@ function versions(repo, where, rename, before) {
 const zitFirst = Number(value(ZIT, "SELECT min(e.mtime) FROM mlink m JOIN filename fn USING(fnid) JOIN event e ON e.objid=m.mid WHERE fn.name GLOB 'docs/rfcs/draft-fossil-*.txt'"));
 const all = [
   ...versions(ORIGINALS, "fn.name GLOB 'draft-fossil-*.txt'", (n) => n, zitFirst),
-  ...versions(ZIT, "fn.name GLOB 'docs/rfcs/draft-fossil-*.txt' OR fn.name GLOB 'docs/rfcs/erratum/*'", (n) => n.slice("docs/rfcs/".length)),
+  ...versions(ZIT, "fn.name GLOB 'docs/rfcs/draft-fossil-*-00.txt' OR fn.name GLOB 'docs/rfcs/erratum/*'", (n) => n.slice("docs/rfcs/".length)),
 ];
 
 // Group by check-in, oldest first.

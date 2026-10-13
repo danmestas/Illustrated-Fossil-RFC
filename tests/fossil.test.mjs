@@ -13,6 +13,7 @@ const { instance } = await WebAssembly.instantiate(wasm, go.importObject);
 await new Promise((ready) => { globalThis.onFossilReady = ready; go.run(instance); });
 const fossil = globalThis.fossil, P = JSON.parse;
 const KEYS = { dl: "delta-format", af: "artifact-format", rs: "repo-state", sp: "sync-protocol" };
+// Each draft is one -00 file; the revision named inside its current text.
 const REVS = { dl: "00", af: "01", rs: "01", sp: "01" };
 const repo = () => new Uint8Array(fs.readFileSync(path.join(root, "rfcs/repos/rfcs.fossil")));
 
@@ -27,17 +28,17 @@ test("the repository opens, verifies, and every artifact matches its name", () =
 });
 
 for (const [key, name] of Object.entries(KEYS)) {
-  test(`${name}: the draft is at the tip, with a history, and the -00 text and its errata beside it`, () => {
+  test(`${name}: the draft is at the tip as one file carrying its current revision, with a history, and its errata beside it`, () => {
     fossil.open(key, repo());
     const timeline = P(fossil.timeline());
-    const file = `draft-fossil-${name}-${REVS[key]}.txt`;
+    const file = `draft-fossil-${name}-00.txt`;
     const touched = timeline.filter((ci) => P(fossil.files(ci.uuid)).some((f) => f.Name === file));
-    assert.ok(touched.length >= (REVS[key] === "00" ? 2 : 1), "the draft has a history");
+    assert.ok(touched.length >= 2, "the draft has a history");
     const text = P(fossil.read(timeline[0].uuid, file)).text;
     assert.match(text, new RegExp(`draft-fossil-${name}-${REVS[key]}`));
-    if (REVS[key] === "01") assert.match(text, new RegExp(`Changes from draft-fossil-${name}-00`), "the -01 text lists its changes");
+    if (REVS[key] !== "00") assert.match(text, new RegExp(`Changes from draft-fossil-${name}-00`), "the revised text lists its changes");
     const tip = P(fossil.files(timeline[0].uuid));
-    assert.ok(tip.some((f) => f.Name === `draft-fossil-${name}-00.txt`), "the -00 text stays beside it");
+    assert.ok(!tip.some((f) => /^draft-fossil-.*-0[1-9]\.txt$/.test(f.Name)), "no revision is a separate file");
     const errata = tip.filter((f) => f.Name.startsWith(`erratum/${name}-`));
     for (const e of errata) assert.match(P(fossil.read(timeline[0].uuid, e.Name)).text, /^# (Technical )?[Ee]rratum/);
   });
@@ -50,7 +51,7 @@ for (const [key, name] of Object.entries(KEYS)) {
   test(`${name}: the check-ins annotate names are the draft's versions`, () => {
     fossil.open(key, repo());
     const timeline = P(fossil.timeline());
-    const file = `draft-fossil-${name}-${REVS[key]}.txt`;
+    const file = `draft-fossil-${name}-00.txt`;
     const versions = [];
     for (const ci of [...timeline].reverse()) {
       const f = P(fossil.files(ci.uuid)).find((x) => x.Name === file);

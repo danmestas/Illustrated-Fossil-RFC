@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.6.0
+
+- Each draft is one file again. The -01 texts of the artifact-format,
+  repo-state and sync-protocol drafts were separate files from 12 October,
+  so their History began at the fold and the -00 history ended there. zit's
+  -00 files now carry every erratum as its own check-in, up to a check-in
+  that makes each one its -01 revision, and the separate -01 files are
+  gone; the repository is rebuilt from that history, so History runs from
+  the first draft to the current revision and Changes marks each erratum.
+- Four more errata, applied: leaf rechecks only on branch-tag events, the
+  skip test against an inherited row, and the ckout keyword, in repository
+  state; the ci-lock reply's avoid-delta-manifests pragma in the sync
+  protocol.
+- The Worker starts a fresh stored copy of the repository, since the
+  rebuilt history cannot be merged into the old one. A clone made before
+  this release sees the rewritten history as a fork on its next pull.
+
 ## 0.5.1
 
 - The Draft text view lists each version of a draft under the check-in that

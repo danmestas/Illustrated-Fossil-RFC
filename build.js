@@ -21,6 +21,7 @@ if (!["worker", "artifact"].includes(TARGET) || args.length !== 1) {
 const OUT = path.resolve(process.env.INIT_CWD || process.cwd(), args[0]);
 const KEYS = { dl: "delta-format", af: "artifact-format", rs: "repo-state", sp: "sync-protocol" };
 // The revision of each draft the site shows; -01 folded the errata in.
+// The revision each draft's current text names; the file is always the -00 file.
 const REVS = { dl: "00", af: "01", rs: "01", sp: "01" };
 // The one repository the site serves: every draft and erratum (scripts/build-repo.mjs).
 const REPO = "rfcs/repos/rfcs.fossil";
@@ -76,7 +77,7 @@ const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, 
   const codeTerms = JSON.parse(fs.readFileSync("rfcs/code-terms.json", "utf8"));
   const fallback = {};
   for (const [key, name] of Object.entries(KEYS)) {
-    const text = execFileSync("fossil", ["cat", "-R", REPO, "-r", "trunk", `draft-fossil-${name}-${REVS[key]}.txt`], { encoding: "utf8", maxBuffer: 1 << 26 });
+    const text = execFileSync("fossil", ["cat", "-R", REPO, "-r", "trunk", `draft-fossil-${name}-00.txt`], { encoding: "utf8", maxBuffer: 1 << 26 });
     fallback[key] = rfcRender(text, { codeTerms: codeTerms[key] });
   }
 

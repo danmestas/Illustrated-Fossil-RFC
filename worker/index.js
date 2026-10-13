@@ -145,9 +145,17 @@ async function errorReply(message) {
   return new Response(out, { headers: { "Content-Type": SYNC_TYPE, "Cache-Control": "no-store" } });
 }
 
+// The stored copy takes in whatever a newer published copy adds, which
+// serves a published history that only grows. When the published history is
+// rewritten instead, as when the -01 drafts folded back into their -00
+// files, a merge would keep both histories as two leaves; bumping the
+// generation starts a fresh object from the published copy and abandons the
+// old object, with whatever had been pushed to it.
+const GENERATION = 2;
+
 // Hand the request to the repository's Durable Object, naming it.
 function toRepo(name, request, env) {
-  const stub = env.REPO.get(env.REPO.idFromName(name));
+  const stub = env.REPO.get(env.REPO.idFromName(`${name}#${GENERATION}`));
   const headers = new Headers(request.headers);
   headers.set("X-Fossil-Repo", name);
   return stub.fetch(new Request(request, { headers }));
