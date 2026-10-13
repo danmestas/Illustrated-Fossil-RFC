@@ -73,9 +73,12 @@ func openCopy(data []byte) (r *libfossil.Repo, close func(), err error) {
 }
 
 // artifacts summarises the blob table, to tell whether a call added any.
+// Phantoms are counted apart from held content: a push's first round records
+// the artifacts it will send as phantoms, and the round that sends them fills
+// those rows in, adding none.
 func artifacts(r *libfossil.Repo) (string, error) {
 	var s string
-	err := r.DB().QueryRow("SELECT count(*) || '/' || coalesce(max(rid), 0) FROM blob").Scan(&s)
+	err := r.DB().QueryRow("SELECT count(*) || '/' || coalesce(max(rid), 0) || '/' || coalesce(sum(size >= 0), 0) FROM blob").Scan(&s)
 	return s, err
 }
 
@@ -135,11 +138,15 @@ func changed(r *libfossil.Repo, before string) ([]byte, error) {
 	return publishable(r)
 }
 
-// sync(repo, request, accounts): one sync request body against the
-// repository's bytes. Returns {reply, repo}, repo being the new bytes or null.
+// sync(repo, request, accounts, loginCookie): one sync request body against
+// the repository's bytes. loginCookie is the request's x-f-l-c cookie, "" when
+// it has none: once a client has seen this server's version it moves its
+// login card from the body to that cookie, so a round that arrives without
+// it is answered as nobody. Returns {reply, repo}, repo being the new bytes
+// or null.
 func syncCall(args []js.Value) (js.Value, error) {
-	if len(args) != 3 {
-		return js.Undefined(), fmt.Errorf("sync takes the repository, the request body and the accounts")
+	if len(args) != 4 {
+		return js.Undefined(), fmt.Errorf("sync takes the repository, the request body, the accounts and the login cookie")
 	}
 	r, close, err := openCopy(bytesOf(args[0]))
 	if err != nil {
@@ -153,7 +160,7 @@ func syncCall(args []js.Value) (js.Value, error) {
 	if err != nil {
 		return js.Undefined(), err
 	}
-	reply, err := r.HandleSync(context.Background(), bytesOf(args[1]))
+	reply, err := r.HandleSyncWithOpts(context.Background(), bytesOf(args[1]), libfossil.HandleOpts{LoginCookie: args[3].String()})
 	if err != nil {
 		return js.Undefined(), err
 	}

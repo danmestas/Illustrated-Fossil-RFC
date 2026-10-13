@@ -123,13 +123,24 @@ export class FossilRepo extends DurableObject {
     if (body.length > MAX_REQUEST_BYTES) return text(413, "request too large");
     let result;
     try {
-      result = check(boot().sync(repo, body, this.env.FOSSIL_PUSHERS || ""));
+      result = check(boot().sync(repo, body, this.env.FOSSIL_PUSHERS || "", loginCookie(request.headers.get("Cookie"))));
     } catch (e) {
       return text(400, `sync failed: ${e.message}`);
     }
     if (result.repo) await this.#write(result.repo, this.#seed);
     return new Response(result.reply, { headers: { "Content-Type": SYNC_TYPE, "Cache-Control": "no-store" } });
   }
+}
+
+// The value of the x-f-l-c cookie in a Cookie header, or "". A fossil client
+// that has seen the server's version sends its login card there instead of
+// in the body on every round after the first.
+function loginCookie(header) {
+  for (const part of (header || "").split(";")) {
+    const [name, ...value] = part.trim().split("=");
+    if (name === "x-f-l-c") return value.join("=");
+  }
+  return "";
 }
 
 // A sync reply holding one error card: the compressed container of

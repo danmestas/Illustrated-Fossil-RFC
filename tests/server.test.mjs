@@ -36,13 +36,16 @@ test("no account can log in to the shipped repository", async () => {
 
 test("stock fossil clones the repository, pushes only with an account, and the push persists", async (t) => {
   let stored = new Uint8Array(fs.readFileSync(REPO));
+  let writes = 0;
   const httpServer = http.createServer((req, res) => {
     const chunks = [];
     req.on("data", (c) => chunks.push(c));
     req.on("end", () => {
-      const result = server.sync(stored, new Uint8Array(Buffer.concat(chunks)), PUSHERS);
+      // After the first round fossil carries its login card in this cookie.
+      const cookie = (req.headers.cookie || "").split(";").map((c) => c.trim()).find((c) => c.startsWith("x-f-l-c="));
+      const result = server.sync(stored, new Uint8Array(Buffer.concat(chunks)), PUSHERS, cookie ? cookie.slice("x-f-l-c=".length) : "");
       if (result.error) { res.writeHead(400).end(result.error); return; }
-      if (result.repo) stored = result.repo;
+      if (result.repo) { stored = result.repo; writes++; }
       res.writeHead(200, { "Content-Type": "application/x-fossil" }).end(Buffer.from(result.reply));
     });
   });
@@ -63,8 +66,9 @@ test("stock fossil clones the repository, pushes only with an account, and the p
   fs.appendFileSync(path.join(checkout, "draft-fossil-delta-format-00.txt"), "a pushed edit\n");
   await run("fossil", ["commit", "-m", "a pushed edit", "--user-override", "editor", "--no-warnings"], { cwd: checkout });
   const output = (r) => `${r.stdout}${r.stderr}`;
-  assert.match(output(await run("fossil", ["push", `http://${host}/rfcs`], { cwd: checkout }).catch((e) => e)), /push denied/);
+  assert.match(output(await run("fossil", ["push", `http://${host}/rfcs`], { cwd: checkout }).catch((e) => e)), /not authorized to write/);
   assert.match(output(await run("fossil", ["push", `http://editor:wrong@${host}/rfcs`], { cwd: checkout }).catch((e) => e)), /login failed/);
+  assert.equal(writes, 0, "a refused push stores nothing");
   assert.match(output(await run("fossil", ["push", `http://editor:a-test-password@${host}/rfcs`], { cwd: checkout })), /Artifacts sent: [1-9]/);
   await run("fossil", ["close", "--force"], { cwd: checkout });
 

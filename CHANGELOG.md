@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.6.1
+
+- go-libfossil v0.12.0, from v0.11.1. The sync server and the in-browser
+  repository now carry the fixes behind the 13 October errata: one
+  transaction per sync round, a received delta verified against its hash
+  before it is stored, ci-lock and ci-unlock for any requester, a pushed
+  file that fails its handler ending the round, and the leaf table kept
+  incrementally.
+- With that release the server announces itself as one that reads the
+  login card from the x-f-l-c cookie, so fossil moves its login there after
+  a push's first round; the Worker passes the cookie through. That first
+  round also records the artifacts to come as phantoms, and the round that
+  fills them in is now kept as a change.
+- A push without an account is refused with Fossil's own words, "not
+  authorized to write".
+
 ## 0.6.0
 
 - Each draft is one file again. The -01 texts of the artifact-format,
