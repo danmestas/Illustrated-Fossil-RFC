@@ -11,8 +11,7 @@ const rfcRender = require("../rfc-render.js");
 const { railroad, pikchrMeasure } = require("../railroad.js");
 const codeTerms = JSON.parse(fs.readFileSync(path.join(root, "rfcs/code-terms.json"), "utf8"));
 const KEYS = { dl: "delta-format", af: "artifact-format", rs: "repo-state", sp: "sync-protocol" };
-const REVS = { dl: "00", af: "01", rs: "01", sp: "01" };
-const draft = (key) => execFileSync("fossil", ["cat", "-R", path.join(root, "rfcs/repos/rfcs.fossil"), "-r", "trunk", `draft-fossil-${KEYS[key]}-${REVS[key]}.txt`], { encoding: "utf8", maxBuffer: 1 << 26 });
+const draft = (key) => execFileSync("fossil", ["cat", "-R", path.join(root, "rfcs/repos/rfcs.fossil"), "-r", "trunk", `draft-fossil-${KEYS[key]}-00.txt`], { encoding: "utf8", maxBuffer: 1 << 26 });
 const unesc = (s) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&amp;/g, "&");
 const words = (s) => s.replace(/<[^>]+>/g, " ").replace(/&[a-z]+;|&#\d+;/g, " ").split(/[^A-Za-z0-9]+/).filter(Boolean).sort();
 
