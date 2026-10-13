@@ -43,6 +43,25 @@ for (const [key, name] of Object.entries(KEYS)) {
   });
 }
 
+// The draft view lists a version under the oldest check-in that holds its
+// text, since every later check-in of the shared repository holds it too.
+// Those are the check-ins annotate names, so the inline history can find them.
+for (const [key, name] of Object.entries(KEYS)) {
+  test(`${name}: the check-ins annotate names are the draft's versions`, () => {
+    fossil.open(key, repo());
+    const timeline = P(fossil.timeline());
+    const file = `draft-fossil-${name}-${REVS[key]}.txt`;
+    const versions = [];
+    for (const ci of [...timeline].reverse()) {
+      const f = P(fossil.files(ci.uuid)).find((x) => x.Name === file);
+      if (f && !versions.some((v) => v.fileUuid === f.UUID)) versions.push({ uuid: ci.uuid, fileUuid: f.UUID });
+    }
+    const named = new Set(P(fossil.annotate(file, timeline[0].uuid)).map((l) => l.uuid));
+    assert.ok(named.size >= 2, "annotate names more than one check-in");
+    for (const uuid of named) assert.ok(versions.some((v) => v.uuid === uuid), `${uuid.slice(0, 10)} changed the draft but is not listed as a version`);
+  });
+}
+
 for (const kind of ["pull", "push"]) {
   test(`a ${kind} between two copies converges`, () => {
     fossil.open("rfcs", repo());

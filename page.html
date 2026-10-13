@@ -2077,11 +2077,15 @@ LF        = %x0A</pre>
   function refreshRepo() {
     texts.clear(); maps.clear();
     checkins = P(api.timeline());
+    // One repository holds every draft, so most check-ins carry this file
+    // unchanged. A version belongs to the oldest check-in that holds its
+    // text: that is the check-in that changed it, and the one annotate names.
     versions = [];
-    for (const ci of checkins) {
+    for (const ci of [...checkins].reverse()) {
       const f = P(api.files(ci.uuid)).find((x) => x.Name === FILE);
       if (f && !versions.some((v) => v.fileUuid === f.UUID)) versions.push({ uuid: ci.uuid, time: ci.time, fileUuid: f.UUID, user: ci.user, comment: ci.comment });
     }
+    versions.reverse();
     const seg = $("#versionSeg");
     seg.textContent = "";
     versions.forEach((v, i) => {

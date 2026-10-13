@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.1
+
+- The Draft text view lists each version of a draft under the check-in that
+  changed it. Since 0.4.0 every draft shares one repository, and a version
+  was listed under the newest check-in that merely carried it, so the tip
+  bore the wrong date and comment, Changes marked nothing, and History
+  left most blocks without a chip.
+
 ## 0.5.0
 
 - The artifact-format, repo-state and sync-protocol pages show the -01
