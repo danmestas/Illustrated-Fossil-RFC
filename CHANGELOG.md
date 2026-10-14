@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.4
+
+- The served repository's artifact-format §4.7.3 erratum names the Fossil
+  check-in, 4886b7de6d of 14 October, that stops zip, tarball and sqlar
+  crashing on a named delta's delete markers; Fossil 2.28 still crashes.
+  The change is one check-in after the 0.6.3 tip, so existing clones pull
+  it and nothing forks.
+
 ## 0.6.3
 
 - The served repository carries two more errata of 14 October. The
