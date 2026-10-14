@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.2
+
+- The served repository carries two more check-ins of the drafts: the
+  sync-protocol §9.4 correction (the forbid-delta-manifests default is
+  Fossil 2.29's; 2.28 defaults off) and the repo-state §5.3 erratum of 14
+  October, under which a cancel's value stays on the stored row as Fossil
+  writes it and only the cached state and the propagation walk treat it as
+  null. Nothing earlier in the history changed, so existing clones pull the
+  two check-ins and nothing forks.
+
 ## 0.6.1
 
 - go-libfossil v0.12.0, from v0.11.1. The sync server and the in-browser
