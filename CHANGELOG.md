@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.3
+
+- The served repository carries two more errata of 14 October. The
+  artifact-format §4.7.3 erratum says a named delta's delete markers are
+  filtered like the delta's own, and records that Fossil 2.28's zip,
+  tarball and sqlar crash on them and that its file-change records for
+  such a check-in are left undefined. The repo-state §5.3 and §6.2 erratum
+  says an artifact's tag cards apply in card order, so a branch root that
+  both applies and cancels its own sym tag keeps it. Nothing earlier in
+  the history changed, so existing clones pull the two check-ins and
+  nothing forks.
+
 ## 0.6.2
 
 - The served repository carries two more check-ins of the drafts: the
