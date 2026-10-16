@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.5
+
+- The served repository carries three more errata of 16 October. The
+  artifact-format §4.4 and §6.2 erratum says the Z card is last because
+  of the ordering and required-card rules, not the checksum framing,
+  which reads the final 35 bytes by position. The §4.7.8 erratum says an
+  absent and an empty J value decode alike and a reader must not tell
+  them apart. The sync-protocol §6.6 erratum lets a server append words
+  to a "not authorized to ..." refusal, as Fossil does with its
+  localauth setting, and has clients match the leading text. Nothing
+  earlier in the history changed, so existing clones pull the three
+  check-ins and nothing forks.
+
 ## 0.6.4
 
 - The served repository's artifact-format §4.7.3 erratum names the Fossil
