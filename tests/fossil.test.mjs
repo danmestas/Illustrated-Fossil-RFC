@@ -14,7 +14,9 @@ await new Promise((ready) => { globalThis.onFossilReady = ready; go.run(instance
 const fossil = globalThis.fossil, P = JSON.parse;
 const KEYS = { dl: "delta-format", af: "artifact-format", rs: "repo-state", sp: "sync-protocol" };
 // Each draft is one -00 file; the revision named inside its current text.
-const REVS = { dl: "00", af: "01", rs: "01", sp: "01" };
+const REVS = { dl: "00", af: "00", rs: "00", sp: "00" };
+// The drafts revised in place, whose text lists its changes in an appendix.
+const REVISED = new Set(["af", "rs", "sp"]);
 const repo = () => new Uint8Array(fs.readFileSync(path.join(root, "rfcs/repos/rfcs.fossil")));
 
 test("the repository opens, verifies, and every artifact matches its name", () => {
@@ -28,7 +30,7 @@ test("the repository opens, verifies, and every artifact matches its name", () =
 });
 
 for (const [key, name] of Object.entries(KEYS)) {
-  test(`${name}: the draft is at the tip as one file carrying its current revision, with a history, and its errata beside it`, () => {
+  test(`${name}: the draft is at the tip as one file carrying its current revision, with a history, and no errata`, () => {
     fossil.open(key, repo());
     const timeline = P(fossil.timeline());
     const file = `draft-fossil-${name}-00.txt`;
@@ -36,11 +38,10 @@ for (const [key, name] of Object.entries(KEYS)) {
     assert.ok(touched.length >= 2, "the draft has a history");
     const text = P(fossil.read(timeline[0].uuid, file)).text;
     assert.match(text, new RegExp(`draft-fossil-${name}-${REVS[key]}`));
-    if (REVS[key] !== "00") assert.match(text, new RegExp(`Changes from draft-fossil-${name}-00`), "the revised text lists its changes");
+    if (REVISED.has(key)) assert.match(text, /Changes in This Revision/, "the revised text lists its changes");
     const tip = P(fossil.files(timeline[0].uuid));
     assert.ok(!tip.some((f) => /^draft-fossil-.*-0[1-9]\.txt$/.test(f.Name)), "no revision is a separate file");
-    const errata = tip.filter((f) => f.Name.startsWith(`erratum/${name}-`));
-    for (const e of errata) assert.match(P(fossil.read(timeline[0].uuid, e.Name)).text, /^# (Technical )?[Ee]rratum/);
+    assert.ok(!tip.some((f) => f.Name.startsWith("erratum/")), "every erratum is applied in its draft, so none remains at the tip");
   });
 }
 

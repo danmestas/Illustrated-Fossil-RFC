@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.7
+
+- The artifact-format, repo-state and sync-protocol texts name themselves
+  -00 again: they are their -00 drafts revised in place, and their
+  appendix is now "Changes in This Revision". No normative text changed.
+  The draft pages, the reading headers and the tests say -00 to match.
+  The served repository gains the one check-in that relabels them, so
+  existing clones pull it and nothing forks.
+
 ## 0.6.6
 
 - The served repository carries the 19 October revisions of the

@@ -1067,7 +1067,7 @@ LF        = %x0A</pre>
   let curKey = "dl";
   const CODE_TERMS = JSON.parse(document.getElementById("codeTermsData").textContent);
   const fileOf = (k) => `draft-fossil-${RFCS[k].name}-${RFCS[k].rev}.txt`;
-  // One repository holds every draft, with the errata the -01 revisions folded in; each RFC reads its own draft from it.
+  // One repository holds every draft and its history; each RFC reads its own draft from it.
   const REPO_FILE = HOST === "worker" ? "repos/rfcs.fossil" : "rfcs-fossil.txt";
   const repoFileOf = () => REPO_FILE;
   const fossilNameOf = () => "fossil-rfcs.fossil";

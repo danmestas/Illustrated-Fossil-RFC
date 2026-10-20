@@ -20,10 +20,9 @@ if (!["worker", "artifact"].includes(TARGET) || args.length !== 1) {
 }
 const OUT = path.resolve(process.env.INIT_CWD || process.cwd(), args[0]);
 const KEYS = { dl: "delta-format", af: "artifact-format", rs: "repo-state", sp: "sync-protocol" };
-// The revision of each draft the site shows; -01 folded the errata in.
 // The revision each draft's current text names; the file is always the -00 file.
-const REVS = { dl: "00", af: "01", rs: "01", sp: "01" };
-// The one repository the site serves: every draft and erratum (scripts/build-repo.mjs).
+const REVS = { dl: "00", af: "00", rs: "00", sp: "00" };
+// The one repository the site serves: every draft and its history (scripts/build-repo.mjs).
 const REPO = "rfcs/repos/rfcs.fossil";
 const STUDIO = "https://pikchr-studio.daniel-mestas.workers.dev/";
 const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
