@@ -95,26 +95,54 @@ With Go 1.27.1 the results are byte for byte the committed files.
 
 ## The repositories
 
-`node scripts/build-repo.mjs` rebuilds `rfcs/repos/rfcs.fossil`. zit is the
-authoritative home of the drafts (`docs/rfcs/` in zit's repository); the
-build replays their history:
+`scripts/build-repo.mjs` updates an explicitly named output repository. It
+never publishes it. Work on a copy of the currently published
+`rfcs/repos/rfcs.fossil`, not a checkout copy or a live served database:
 
-1. the original drafts in `~/fossil-rfc`'s repository, from before zit took
-   them over;
-2. zit's history of `docs/rfcs/draft-fossil-*.txt` and `docs/rfcs/erratum/*`.
+```sh
+OUTPUT_REPO=/absolute/scratch/rfcs.fossil node scripts/build-repo.mjs
+```
 
-Each distinct version of a file is committed once, with the date, author and
-comment of the check-in that introduced it. Only zit check-ins that trunk
-descends from count, so a branch's work appears once it lands. Every change a
-trunk check-in makes is replayed at that check-in, deletions included, which
-is how the retired errata leave the tip. Drafts sit at the repository's root
-and errata, while they existed, under `erratum/`. The project code is fixed, so a rebuild is
-the same project: existing clones keep pulling, and the Worker's stored copy
-merges it in.
+`ZIT_REPO` and `ORIGINALS_REPO` optionally select source repository files;
+the defaults are `~/zit/.zit.fossil` and `~/fossil-rfc/fossil-rfc.fossil`.
+Do not use a source repository as the output. Tests create synthetic stores
+and run a copied script in scratch space, never against the served repository.
+
+For an existing output, every published check-in artifact is preserved. The
+script appends projected snapshots along zit trunk's primary-parent chain,
+not by timestamp. Merged work appears only as trunk resolved it, at its
+integration, including deletion, reversion and discarded conflict changes.
+A merge with no draft delta advances the checkpoint without a new generated
+check-in. Drafts sit at the repository root and errata under `erratum/`.
+The final tracked files exactly match trunk's `docs/rfcs/draft-fossil-*-00.txt`
+and `docs/rfcs/erratum/*`. Older dates and equal timestamps do not reorder
+the chain. Check-ins retain their source date, author and comment.
+
+The first update of a legacy published copy requires `ZIT_CHECKPOINT` set to
+the **full source trunk check-in hash whose projected snapshot matches that
+copy's tip**. Choose the source check-in used for the publication (not an
+arbitrary current tip). The script validates the entire tracked filename and
+content set before accepting it. A mismatch fails without replacing the
+output: locate the correct checkpoint rather than deleting or rebuilding the
+published chain. On success the checkpoint and source project identity live
+in the output's `config` table under `rfc-projection-v1`; they are checked
+again on every update. They are local metadata, not synced artifacts. A copy
+that loses them can be bootstrapped again using the same validation. A fork,
+source rewind, changed project identity or divergent output fails closed.
+
+A nonexistent output creates a **new** projection: the original archive's
+pre-import versions, then resolved trunk snapshots. It is not a substitute
+for a published copy: it cannot reconstruct legacy check-in identities. A
+fixed project code alone does not preserve those identities. Keep the current
+published repository as the baseline; review the staged result before any
+separate publication. Updates use a temporary database beside the output,
+run integrity checks, then atomically replace only that output on success.
 
 The repository is published and served, so the build clears every
 account's password and capabilities but `nobody`'s: no one can log in to
-it, and `nobody` can clone and pull but not push.
+it, and `nobody` can clone and pull but not push. The staged database is
+vacuumed after sanitization so old password bytes are removed from its pages
+before it replaces the output.
 
 ## Releases
 
