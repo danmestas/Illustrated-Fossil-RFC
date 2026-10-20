@@ -14,7 +14,11 @@
 // Each distinct version of a file is committed once, with the date, user and
 // comment of the earliest check-in that introduced it; versions introduced by
 // the same check-in are committed together. Drafts sit at the repository's
-// root and errata under erratum/, as in zit's docs/rfcs/.
+// root and errata under erratum/, as in zit's docs/rfcs/. From zit, only
+// check-ins that trunk descends from count, so a branch appears once it lands
+// and its unlanded work never does; and every change a trunk check-in makes,
+// a deletion or a return to an earlier text included, is replayed at that
+// check-in.
 //
 // The project code is fixed, so a rebuild is the same project: the Worker's
 // stored copy merges it in, and existing clones keep pulling from it.
@@ -53,10 +57,35 @@ function versions(repo, where, rename, before) {
     .map(([name, file, checkin, mtime, date, user]) => ({ repo, path: rename(name), file, checkin, mtime: Number(mtime), date, user }));
 }
 
+// The check-ins trunk descends from: its newest check-in and every ancestor,
+// merge parents included.
+const ANCESTRY = `WITH RECURSIVE tip(rid) AS (
+    SELECT x.rid FROM tagxref x JOIN tag USING(tagid) JOIN event e ON e.objid=x.rid
+    WHERE tagname='sym-trunk' AND tagtype>0 ORDER BY e.mtime DESC LIMIT 1),
+  anc(rid) AS (SELECT rid FROM tip UNION SELECT pid FROM plink JOIN anc ON cid=anc.rid)`;
+const ON_TRUNK = "(SELECT x.rid FROM tagxref x JOIN tag USING(tagid) WHERE tagname='sym-trunk' AND tagtype>0)";
+
+// zit's versions: each first introduced by a check-in trunk descends from,
+// plus every change a trunk check-in makes against its parent, deletions
+// (file null) included.
+function zitVersions(where, rename) {
+  const rows = sql(ZIT, `${ANCESTRY}
+    SELECT fn.name, coalesce(b.uuid, ''), c.uuid, e.mtime, datetime(e.mtime), e.user
+    FROM mlink m JOIN filename fn USING(fnid) LEFT JOIN blob b ON b.rid=m.fid
+      JOIN blob c ON c.rid=m.mid JOIN event e ON e.objid=m.mid
+    WHERE (${where}) AND m.mid IN (SELECT rid FROM anc) AND (
+      (m.isaux=0 AND m.mid IN ${ON_TRUNK})
+      OR (m.fid>0 AND e.mtime = (SELECT min(e2.mtime) FROM mlink m2 JOIN event e2 ON e2.objid=m2.mid
+                                 WHERE m2.fid=m.fid AND m2.fnid=m.fnid AND m2.mid IN (SELECT rid FROM anc))))
+    GROUP BY fn.name, c.uuid`);
+  return rows.map(([name, file, checkin, mtime, date, user]) =>
+    ({ repo: ZIT, path: rename(name), file: file || null, checkin, mtime: Number(mtime), date, user }));
+}
+
 const zitFirst = Number(value(ZIT, "SELECT min(e.mtime) FROM mlink m JOIN filename fn USING(fnid) JOIN event e ON e.objid=m.mid WHERE fn.name GLOB 'docs/rfcs/draft-fossil-*.txt'"));
 const all = [
   ...versions(ORIGINALS, "fn.name GLOB 'draft-fossil-*.txt'", (n) => n, zitFirst),
-  ...versions(ZIT, "fn.name GLOB 'docs/rfcs/draft-fossil-*-00.txt' OR fn.name GLOB 'docs/rfcs/erratum/*'", (n) => n.slice("docs/rfcs/".length)),
+  ...zitVersions("fn.name GLOB 'docs/rfcs/draft-fossil-*-00.txt' OR fn.name GLOB 'docs/rfcs/erratum/*'", (n) => n.slice("docs/rfcs/".length)),
 ];
 
 // Group by check-in, oldest first.
@@ -81,6 +110,10 @@ try {
   for (const g of groups.values()) {
     for (const f of g.files) {
       const dest = path.join(work, f.path);
+      if (!f.file) {
+        fs.rmSync(dest, { force: true });
+        continue;
+      }
       fs.mkdirSync(path.dirname(dest), { recursive: true });
       fs.writeFileSync(dest, execFileSync("fossil", ["artifact", f.file, "-R", f.repo], { maxBuffer: 1 << 28 }));
     }

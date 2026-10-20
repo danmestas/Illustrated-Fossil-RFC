@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.6.6
+
+- The served repository carries the 19 October revisions of the
+  sub-manifests and sparse-cone drafts: the sub-manifest peer gate becomes
+  the send-submanifests pragma, clone-time adoption and the history replay
+  are specified, the provisional phase retires, and sparse-cone's literal
+  prefix and exclusion rules are merged. Every erratum is now applied in its
+  draft, so the erratum files leave the tip; their history stays.
+- The build replays zit's trunk only: a version counts once trunk descends
+  from the check-in that introduced it, and every change a trunk check-in
+  makes, a deletion or a return to an earlier text, is replayed there. The
+  horizon branch's unlanded work stays out; its merge of 17 October, backed
+  out the same day, appears and is undone as it was. Nothing earlier in the
+  history changed, so existing clones pull the new check-ins and nothing
+  forks.
+
 ## 0.6.5
 
 - The served repository carries three more errata of 16 October. The

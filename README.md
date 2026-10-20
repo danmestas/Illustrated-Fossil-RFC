@@ -15,8 +15,8 @@ State and Sync Protocol — as one site. Each draft has three views:
   every artifact's name, a rebuild of the derived tables, and an animated
   sync between two copies.
 
-One Fossil repository holds every draft, the errata the -01 revisions
-folded in, and their real history. It is also a Fossil server, so stock `fossil` can clone, pull and
+One Fossil repository holds every draft and its real history, including
+the errata files zit kept until every erratum was applied. It is also a Fossil server, so stock `fossil` can clone, pull and
 push it:
 
 ```sh
@@ -74,7 +74,7 @@ binary as base64 text beside it.
 | `rfc-render.js`, `rfcs/code-terms.*`, `rfcs/rfc-table.css` | the draft-text renderer and its code literals |
 | `railroad.js` | ABNF to Pikchr syntax diagrams |
 | `delta.js` | Fossil's delta codec, for the playground |
-| `rfcs/repos/rfcs.fossil` | the repository: every draft and erratum, built by `scripts/build-repo.mjs` |
+| `rfcs/repos/rfcs.fossil` | the repository: every draft and its history, built by `scripts/build-repo.mjs` |
 | `wasm/` | the go-libfossil programs the Repository view and the sync server run, and their build |
 | `worker/` | the Worker script and its Durable Object: the repository as a Fossil server |
 | `vendor/` | Pikchr's WebAssembly build (from pikchr-studio) and Go's `wasm_exec.js` (Go 1.27.1) |
@@ -96,16 +96,19 @@ With Go 1.27.1 the results are byte for byte the committed files.
 ## The repositories
 
 `node scripts/build-repo.mjs` rebuilds `rfcs/repos/rfcs.fossil`. zit is the
-authoritative home of the drafts and errata (`docs/rfcs/` in zit's
-repository); the build replays their history:
+authoritative home of the drafts (`docs/rfcs/` in zit's repository); the
+build replays their history:
 
 1. the original drafts in `~/fossil-rfc`'s repository, from before zit took
    them over;
 2. zit's history of `docs/rfcs/draft-fossil-*.txt` and `docs/rfcs/erratum/*`.
 
 Each distinct version of a file is committed once, with the date, author and
-comment of the check-in that introduced it. Drafts sit at the repository's
-root and errata under `erratum/`. The project code is fixed, so a rebuild is
+comment of the check-in that introduced it. Only zit check-ins that trunk
+descends from count, so a branch's work appears once it lands. Every change a
+trunk check-in makes is replayed at that check-in, deletions included, which
+is how the retired errata leave the tip. Drafts sit at the repository's root
+and errata, while they existed, under `erratum/`. The project code is fixed, so a rebuild is
 the same project: existing clones keep pulling, and the Worker's stored copy
 merges it in.
 
