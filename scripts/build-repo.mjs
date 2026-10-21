@@ -128,7 +128,9 @@ try {
       fs.writeFileSync(dest, bytes);
     }
     fossil(['addremove', '--dotfiles', '--ignore', '', '--clean', ''], { cwd: work });
-    fossil(['commit', '-m', comment || 'RFC snapshot', '--date-override', date, '--user-override', user,
+    // The acting user belongs to the staged repository, not the host OS.
+    // The historical author remains independent through --user-override.
+    fossil(['commit', '--user', 'dmestas', '-m', comment || 'RFC snapshot', '--date-override', date, '--user-override', user,
       '--allow-older', '--no-warnings'], { cwd: work });
     current = next;
     made++;

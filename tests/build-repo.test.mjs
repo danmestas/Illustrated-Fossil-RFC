@@ -56,6 +56,24 @@ function fixture(t) {
   return { root, env, f, source, original, out, dir, write, commit, run, hashes, snapshot, base };
 }
 
+test('replay actor is independent of host identity and preserves historical authors', { timeout: 120000 }, t => {
+  const x = fixture(t);
+  const unrelated = { USER: 'ciworker', LOGNAME: 'ciworker', FOSSIL_USER: 'not-a-staged-user' };
+  x.run(unrelated);
+  const before = x.hashes();
+  assert.equal(x.snapshot(x.out), x.snapshot(x.source.repo, 'docs/rfcs/'));
+  x.write('test', 'next revision\n');
+  x.commit(x.source.work, '2000-01-05T00:00:00', 'historical update');
+  x.run(unrelated);
+  assert.deepEqual(x.hashes().slice(0, before.length), before);
+  assert.equal(x.snapshot(x.out), x.snapshot(x.source.repo, 'docs/rfcs/'));
+  assert.equal(x.f(['sqlite3', '-R', x.out,
+    "SELECT user FROM event WHERE type='ci' AND comment='historical update'"]), 'review');
+  const after = x.hashes();
+  x.run(unrelated);
+  assert.deepEqual(x.hashes(), after);
+});
+
 for (const mode of ['fresh replay', 'incremental append']) {
   test(`directory and file transitions preserve the trunk snapshot during ${mode}`, { timeout: 120000 }, t => {
     const x = fixture(t);
